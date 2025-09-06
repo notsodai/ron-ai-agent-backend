@@ -31,10 +31,26 @@ class BookAppTest {
     }
 
     @Test
-    void doChatWithBookList() {
+    void doChatWithBookListTest() {
         String conversationId = UUID.randomUUID().toString();
-        String message = "你好,我是Ron。我比较喜欢都市类的书籍，你能向我推荐一些值得阅读的书吗？";
+        String message = "你好,我是Ron。我比较喜欢科幻类的书籍，你能向我推荐一些值得阅读的书吗？";
         String answer = bookApp.doChatWithBookList(message, conversationId);
+        Assertions.assertNotNull(answer);
+    }
+
+    @Test
+    void doChatWithRagTest() {
+        String conversationId = UUID.randomUUID().toString();
+        String message = "你好,我是Ron。我比较喜欢科幻类的书籍，你能向我推荐一些值得阅读的书吗？";
+        BookApp.BookList answer = bookApp.doChatWithRag(message, conversationId);
+        Assertions.assertNotNull(answer);
+    }
+
+    @Test
+    void doChatWithRagCloud() {
+        String conversationId = UUID.randomUUID().toString();
+        String message = "你好,我是Ron。我比较喜欢悬疑类的书籍，你能向我推荐一些值得阅读的书吗？";
+        String answer = bookApp.doChatWithRagCloud(message, conversationId);
         Assertions.assertNotNull(answer);
     }
 }

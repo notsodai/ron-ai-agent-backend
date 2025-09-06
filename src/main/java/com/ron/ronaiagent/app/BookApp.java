@@ -1,16 +1,21 @@
 package com.ron.ronaiagent.app;
 
 import cn.hutool.core.lang.UUID;
-import com.ron.ronaiagent.app.chat.advisor.MyLoggerAdvisor;
-import com.ron.ronaiagent.app.chat.memory.FileBasedChatMemory;
+import com.ron.ronaiagent.chat.chat.advisor.MyLoggerAdvisor;
+import com.ron.ronaiagent.chat.chat.memory.FileBasedChatMemory;
+import com.ron.ronaiagent.chat.chat.rag.BookAppRagCloudAdvisorConfig;
+import com.ron.ronaiagent.chat.chat.rag.BookAppRagConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.core.io.Resource;
@@ -21,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Vector;
 import java.util.stream.Collectors;
 
 @Component
@@ -92,7 +98,7 @@ public class BookApp {
     }
 
     record Book(String name, String author, String summary) { }
-    record BookList(ArrayList<Book> books) { }
+    public record BookList(ArrayList<Book> books) { }
 
     /**
      * AI基础对话
@@ -113,5 +119,53 @@ public class BookApp {
             return bookList.books().stream().map(book -> book.name() + " by " + book.author() + ": " + book.summary()).collect(Collectors.joining("\n"));
         }
         return null;
+    }
+
+    @jakarta.annotation.Resource
+    private VectorStore bookAppVectorStore;
+
+    /**
+     * 带RAG的对话
+     * @param message 用户消息
+     * @param conversationId 会话ID
+     * @return AI回复
+     */
+    public BookList doChatWithRag(String message, String conversationId){
+        BookList bookList = chatClient
+                .prompt()
+                .system(systemPromptTemplate.getTemplate() + "每次都需要生成一个标题为{用户名}的书籍推荐总结，内容为书籍列表")
+                .user(message)
+                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .advisors(new MyLoggerAdvisor())
+                .advisors(new QuestionAnswerAdvisor(bookAppVectorStore))
+                .call()
+                .entity(BookList.class);
+        return bookList;
+    }
+
+
+    @jakarta.annotation.Resource
+    private Advisor bookAppRagCloudAdvisor;
+    /**
+     * 带云知识库的RAG的对话
+     * @param message 用户消息
+     * @param conversationId 会话ID
+     * @return AI回复
+     */
+    public String doChatWithRagCloud(String message, String conversationId){
+        ChatResponse chatResponse = chatClient
+                .prompt()
+                .system(systemPromptTemplate.getTemplate() + "每次都需要生成一个标题为{用户名}的书籍推荐总结，内容为书籍列表")
+                .user(message)
+                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .advisors(new MyLoggerAdvisor())
+                .advisors(bookAppRagCloudAdvisor)
+                .call()
+                .chatResponse();
+
+        assert chatResponse != null;
+        String res = chatResponse.getResult().getOutput().getText();
+        log.info("response: {}", res);
+        return res;
     }
 }

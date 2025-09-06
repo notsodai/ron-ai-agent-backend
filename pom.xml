@@ -91,6 +91,13 @@
             <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
         </dependency>
 
+        <!-- Spring AI Alibaba -->
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter</artifactId>
+            <version>1.0.0-M2.1</version>
+        </dependency>
+
 
         <!-- langchain4j-community-dashscope -->
         <dependency>
@@ -121,9 +128,17 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- spring-ai-markdown-document-reader: 读取 Markdown 文件 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-markdown-document-reader</artifactId>
+            <version>1.0.1</version>
+        </dependency>
+
+        <!-- spring-ai-advisors-vector-store: 创建向量存储 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-advisors-vector-store</artifactId>
             <version>1.0.1</version>
         </dependency>
 

@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.app.chat.memory;
+package com.ron.ronaiagent.chat.chat.memory;
 
 import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.memory.ChatMemory;

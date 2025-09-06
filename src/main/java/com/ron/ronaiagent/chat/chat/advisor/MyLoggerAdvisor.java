@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.app.chat.advisor;
+package com.ron.ronaiagent.chat.chat.advisor;
 
 import jakarta.annotation.Nullable;
 import org.jetbrains.annotations.NotNull;

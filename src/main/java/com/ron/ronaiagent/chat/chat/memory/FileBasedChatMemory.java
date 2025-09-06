@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.app.chat.memory;
+package com.ron.ronaiagent.chat.chat.memory;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;

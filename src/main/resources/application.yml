@@ -9,6 +9,13 @@ spring:
       base-url: http://localhost:11434
       chat:
         model: gpt-oss:20b
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        dimensions: 1536
+        distance-type: COSINE_DISTANCE
+        max-document-batch-size: 10000 # Optional: Maximum number of documents per batch
+
 server:
   port: 8081
   servlet:

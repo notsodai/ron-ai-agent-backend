@@ -53,4 +53,12 @@ class BookAppTest {
         String answer = bookApp.doChatWithRagCloud(message, conversationId);
         Assertions.assertNotNull(answer);
     }
+
+    @Test
+    void doChatWithRagPgVector() {
+        String conversationId = UUID.randomUUID().toString();
+        String message = "你好,我是Ron。我比较喜欢历史类的书籍，你能向我推荐一些值得阅读的书吗？";
+        String answer = bookApp.doChatWithRagPgVector(message, conversationId);
+        Assertions.assertNotNull(answer);
+    }
 }

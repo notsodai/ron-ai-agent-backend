@@ -165,7 +165,33 @@ public class BookApp {
 
         assert chatResponse != null;
         String res = chatResponse.getResult().getOutput().getText();
-        log.info("response: {}", res);
+        log.info("Rag Cloud response: {}", res);
+        return res;
+    }
+
+    @jakarta.annotation.Resource
+    private VectorStore bookAppPgVectorStore;
+
+    /**
+     * 带PgVector的RAG的对话
+     * @param message 用户消息
+     * @param conversationId 会话ID
+     * @return AI回复
+     */
+    public String doChatWithRagPgVector(String message, String conversationId){
+        ChatResponse chatResponse = chatClient
+                .prompt()
+                .system(systemPromptTemplate.getTemplate() + "每次都需要生成一个标题为{用户名}的书籍推荐总结，内容为书籍列表")
+                .user(message)
+                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .advisors(new MyLoggerAdvisor())
+                .advisors(new QuestionAnswerAdvisor(bookAppPgVectorStore))
+                .call()
+                .chatResponse();
+
+        assert chatResponse != null;
+        String res = chatResponse.getResult().getOutput().getText();
+        log.info("Rag PgVector response: {}", res);
         return res;
     }
 }

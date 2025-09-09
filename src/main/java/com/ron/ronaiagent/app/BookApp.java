@@ -3,8 +3,10 @@ package com.ron.ronaiagent.app;
 import cn.hutool.core.lang.UUID;
 import com.ron.ronaiagent.chat.chat.advisor.MyLoggerAdvisor;
 import com.ron.ronaiagent.chat.chat.memory.FileBasedChatMemory;
+import com.ron.ronaiagent.chat.chat.rag.BookAppQueryRewriter;
 import com.ron.ronaiagent.chat.chat.rag.BookAppRagCloudAdvisorConfig;
 import com.ron.ronaiagent.chat.chat.rag.BookAppRagConfig;
+import com.ron.ronaiagent.chat.chat.rag.BookAppRagCustomAdvisorFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -26,6 +28,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Vector;
 import java.util.stream.Collectors;
 
@@ -172,6 +175,9 @@ public class BookApp {
     @jakarta.annotation.Resource
     private VectorStore bookAppPgVectorStore;
 
+    @jakarta.annotation.Resource
+    private BookAppQueryRewriter bookAppQueryRewriter;
+
     /**
      * 带PgVector的RAG的对话
      * @param message 用户消息
@@ -179,13 +185,15 @@ public class BookApp {
      * @return AI回复
      */
     public String doChatWithRagPgVector(String message, String conversationId){
+        String rewrittenMessage = bookAppQueryRewriter.rewrite(message);
         ChatResponse chatResponse = chatClient
                 .prompt()
                 .system(systemPromptTemplate.getTemplate() + "每次都需要生成一个标题为{用户名}的书籍推荐总结，内容为书籍列表")
-                .user(message)
+                .user(rewrittenMessage)
                 .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .advisors(new MyLoggerAdvisor())
-                .advisors(new QuestionAnswerAdvisor(bookAppPgVectorStore))
+                //.advisors(new QuestionAnswerAdvisor(bookAppPgVectorStore))
+                .advisors(BookAppRagCustomAdvisorFactory.createCustomAdvisor(bookAppPgVectorStore, "悬疑"))
                 .call()
                 .chatResponse();
 

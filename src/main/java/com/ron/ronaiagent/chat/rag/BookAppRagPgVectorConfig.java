@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.chat.chat.rag;
+package com.ron.ronaiagent.chat.rag;
 
 import jakarta.annotation.Resource;
 import org.springframework.ai.document.Document;
@@ -18,7 +18,6 @@ import static org.springframework.ai.vectorstore.pgvector.PgVectorStore.PgIndexT
  * @author ron
  * @date 2025/09/07 11:04
  */
-@Configuration
 public class BookAppRagPgVectorConfig {
     @Resource
     private BookAppDocumentLoader bookAppDocumentLoader;

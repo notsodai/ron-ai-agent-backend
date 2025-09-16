@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.chat.chat.rag;
+package com.ron.ronaiagent.chat.rag;
 
 import com.alibaba.cloud.ai.dashscope.embedding.DashScopeEmbeddingModel;
 import org.springframework.ai.document.Document;
@@ -13,7 +13,6 @@ import java.util.List;
 /**
  * BookAppRag配置
  */
-@Configuration
 public class BookAppRagConfig {
     private final BookAppDocumentLoader bookAppDocumentLoader;
     private final EmbeddingModel dashscopeEmbeddingModel;

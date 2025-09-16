@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.chat.chat.rag;
+package com.ron.ronaiagent.chat.rag;
 
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;

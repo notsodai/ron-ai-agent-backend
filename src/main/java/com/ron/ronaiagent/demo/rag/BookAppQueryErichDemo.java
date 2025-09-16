@@ -7,7 +7,6 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.rag.Query;
 import org.springframework.ai.rag.preretrieval.query.expansion.MultiQueryExpander;
 import org.springframework.context.annotation.Bean;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
@@ -15,7 +14,6 @@ import java.util.List;
  * @author admin
  * @date 2025/9/9 下午9:20
  */
-@Component
 public class BookAppQueryErichDemo {
 
     private final Logger logger = LoggerFactory.getLogger(BookAppQueryErichDemo.class);

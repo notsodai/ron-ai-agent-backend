@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.chat.chat.rag;
+package com.ron.ronaiagent.chat.rag;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;

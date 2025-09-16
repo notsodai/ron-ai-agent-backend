@@ -1,7 +1,5 @@
-package com.ron.ronaiagent.chat.chat.rag;
+package com.ron.ronaiagent.chat.rag;
 
-import com.ron.ronaiagent.app.BookApp;
-import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -15,10 +13,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
 public class BookAppDocumentLoader {
     private final ResourcePatternResolver resourcePatternResolver;
-    private static final Logger log = LoggerFactory.getLogger(BookApp.class);
+    private static final Logger log = LoggerFactory.getLogger(BookAppDocumentLoader.class);
     public BookAppDocumentLoader(ResourcePatternResolver resourcePatternResolver) {
         this.resourcePatternResolver = resourcePatternResolver;
     }

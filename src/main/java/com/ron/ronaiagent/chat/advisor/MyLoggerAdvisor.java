@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.chat.chat.advisor;
+package com.ron.ronaiagent.chat.advisor;
 
 import jakarta.annotation.Nullable;
 import org.jetbrains.annotations.NotNull;
@@ -23,6 +23,9 @@ public class MyLoggerAdvisor  implements CallAdvisor, StreamAdvisor {
     public static final Function<ChatResponse, String> DEFAULT_RESPONSE_TO_STRING = ModelOptionsUtils::toJsonStringPrettyPrinter;
 
     private static final Logger logger = LoggerFactory.getLogger(MyLoggerAdvisor.class);
+
+    // 添加最大输入长度常量
+    private static final int MAX_INPUT_LENGTH = 129024;
 
     private final Function<ChatClientRequest, String> requestToString;
 
@@ -67,7 +70,13 @@ public class MyLoggerAdvisor  implements CallAdvisor, StreamAdvisor {
     }
 
     private void logRequest(ChatClientRequest request) {
-        logger.info("request: {}", request.prompt().getUserMessage().getText());
+        String text = request.prompt().getUserMessage().getText();
+        // 添加输入长度检查和截断逻辑
+        if (text.length() > MAX_INPUT_LENGTH) {
+            logger.warn("Input text length {} exceeds maximum allowed length {}, truncating the input", text.length(), MAX_INPUT_LENGTH);
+            text = text.substring(0, MAX_INPUT_LENGTH);
+        }
+        logger.info("request: {}", text);
     }
 
     private void logResponse(ChatClientResponse chatClientResponse) {

@@ -85,4 +85,12 @@ class BookAppTest {
         String answer = bookApp.doChatWithTools(message, chatId);
         Assertions.assertNotNull(answer);
     }
+
+    @Test
+    void doChatWithMcp() {
+        String conversationId = UUID.randomUUID().toString();
+        String message = "我想要一张适合做手机壁纸的大海的风景图片";
+        String answer = bookApp.doChatWithMcp(message, conversationId);
+        Assertions.assertNotNull(answer);
+    }
 }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -81,7 +82,7 @@ public class ImageSearchTool {
                         .stream()
                         .map(photoObj -> (JSONObject) photoObj)
                         .map(photoObj -> photoObj.getJSONObject("src"))
-                        .filter(photoObj -> photoObj != null)
+                        .filter(Objects::nonNull)
                         .map(photo -> photo.getStr("medium"))
                         .filter(StrUtil::isNotBlank)
                         .collect(Collectors.toList());

@@ -36,9 +36,15 @@ public class PDFGenerationTool {
 //                        .toAbsolutePath().toString();
 //                PdfFont font = PdfFontFactory.createFont(fontPath,
 //                        PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
-                // 使用内置中文字体
-                PdfFont font = PdfFontFactory.createFont("STSongStd-Light", "UniGB-UCS2-H");
-                document.setFont(font);
+                        // 使用内置中文字体，使用正确的iText API
+                try {
+                    PdfFont font = PdfFontFactory.createFont("STSong-Light", "UniGB-UCS2-H");
+                    document.setFont(font);
+                } catch (Exception fontException) {
+                    // 如果中文字体不可用，使用默认字体并添加警告
+                    System.err.println("Warning: Chinese font not available, using default font. Chinese characters may not display correctly.");
+                    // 使用默认字体（无需设置）
+                }
                 // 创建段落
                 Paragraph paragraph = new Paragraph(content);
                 // 添加段落并关闭文档

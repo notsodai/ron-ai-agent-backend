@@ -23,8 +23,10 @@ public class ToolRegistration {
         ResourceDownloadTool resourceDownloadTool = new ResourceDownloadTool();
         WebScrapingTool webScrapingTool = new WebScrapingTool();
         WebSearchTool webSearchTool = new WebSearchTool(searchApiKey);
+        ImageSearchTool imageSearchTool = new ImageSearchTool();
+        TerminateTool terminateTool = new TerminateTool();
 
-        return ToolCallbacks.from(fileOperationTool, pdfGenerationTool, resourceDownloadTool, webScrapingTool, webSearchTool);
+        return ToolCallbacks.from(fileOperationTool, pdfGenerationTool, resourceDownloadTool, webScrapingTool, webSearchTool, imageSearchTool, terminateTool);
 
     }
 }

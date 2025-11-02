@@ -23,6 +23,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.core.io.Resource;
+import reactor.core.publisher.Flux;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -231,5 +232,14 @@ public class BookApp {
 
         assert chatResponse != null;
         return chatResponse.getResult().getOutput().getText();
+    }
+
+    public Flux<String> doChatByStream(String message, String conversationId){
+        return chatClient.prompt()
+                .user(message)
+                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .advisors(new MyLoggerAdvisor())
+                .stream()
+                .content();
     }
 }

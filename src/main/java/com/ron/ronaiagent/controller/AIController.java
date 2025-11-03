@@ -1,5 +1,6 @@
 package com.ron.ronaiagent.controller;
 
+import com.ron.ronaiagent.agent.RonManus;
 import com.ron.ronaiagent.app.BookApp;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -132,5 +133,32 @@ public class AIController {
                     }
                 }, sseEmitter::completeWithError, sseEmitter::complete);
         return sseEmitter;
+    }
+
+    @GetMapping("RonManus/chat/")
+    @Operation(
+            summary = "RonManus智能助手",
+            description = "与RonManus智能助手进行对话，返回完整回复"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "聊天回复成功",
+                    content = @Content(
+                            mediaType = "text/event-stream",
+                            schema = @Schema(description = "RonManus的流式回复内容")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "请求参数错误",
+                    content = @Content
+            )
+    })
+    public SseEmitter doChatWithRonManus(
+        @Parameter(description = "用户消息内容", required = true)
+        @RequestParam String message) {
+        RonManus ronManus = new RonManus(availableTools, dashScopeChatModel);
+        return ronManus.runStream(message);
     }
 }

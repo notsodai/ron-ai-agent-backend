@@ -7,9 +7,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author admin
@@ -93,6 +95,73 @@ public abstract class BaseAgent {
             // 清理资源
             cleanup();
         }
+    }
+
+    /**
+     * 流式执行
+     *
+     * @param userPrompt 用户输入
+     * @return 执行结果
+     */
+    public SseEmitter runStream(String userPrompt) {
+        SseEmitter sseEmitter = new SseEmitter(180000L);
+        // 异步执行，避免阻塞
+        CompletableFuture.runAsync(() -> {
+            try {
+                if (agentState != AgentState.IDLE) {
+                    sseEmitter.send("Agent is not idle" + this.agentState);
+                    sseEmitter.complete();
+                    return;
+                }
+                if (userPrompt == null){
+                    sseEmitter.send("User prompt cannot be empty");
+                    sseEmitter.complete();
+                    return;
+                }
+                this.agentState = AgentState.RUNNING;
+                // 添加用户输入
+                messages.add(new UserMessage(userPrompt));
+                try {
+                    for (int i = 0; i < maxSteps && agentState != AgentState.FINISHED; i++) {
+                        currentStep = i + 1;
+                        logger.info("Current step: {} / {}", currentStep, maxSteps);
+                        String stepResult = step();
+                        sseEmitter.send("Step" + currentStep + ": " + stepResult);
+                    }
+                    if (currentStep >= maxSteps) {
+                        this.agentState = AgentState.FINISHED;
+                        sseEmitter.send("Terminated: Reached max steps (" + maxSteps + ")");
+                    }
+                    sseEmitter.complete();
+                } catch (Exception e){
+                    this.agentState = AgentState.ERROR;
+                    logger.error("Agent error", e);
+                    try{
+                        sseEmitter.send("Error: " + e.getMessage());
+                        sseEmitter.complete();
+                    } catch (Exception e1){
+                        sseEmitter.completeWithError(e1);
+                    }
+                } finally {
+                    cleanup();
+                }
+            } catch (Exception e) {
+                sseEmitter.completeWithError(e);
+            }
+            // 超时处理
+            sseEmitter.onTimeout(() -> {
+                this.agentState = AgentState.ERROR;
+                this.cleanup();
+                logger.error("Agent timeout");
+            });
+            sseEmitter.onCompletion(() -> {
+                this.agentState = AgentState.IDLE;
+                this.cleanup();
+                logger.info("Agent completed");
+            });
+
+        });
+        return sseEmitter;
     }
 
     /**

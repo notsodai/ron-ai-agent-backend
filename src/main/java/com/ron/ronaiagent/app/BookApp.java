@@ -6,6 +6,8 @@ import com.ron.ronaiagent.chat.memory.BookChatMemory;
 import com.ron.ronaiagent.chat.memory.FileBasedChatMemory;
 import com.ron.ronaiagent.chat.rag.BookAppQueryRewriter;
 import com.ron.ronaiagent.chat.rag.BookAppRagCustomAdvisorFactory;
+import com.ron.ronaiagent.core.CacheManager;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -20,6 +22,7 @@ import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.core.io.Resource;
@@ -31,14 +34,22 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
-
 public class BookApp {
     private static ChatClient chatClient;
     private static final Logger log = LoggerFactory.getLogger(BookApp.class);
-    // private final SystemPromptTemplate systemPromptTemplate;
+
+    @Autowired
+    private CacheManager cacheManager;
+
+    // 用于跟踪正在进行的流式请求
+    private final List<String> activeStreamRequests = new ArrayList<>();
+    private final Object streamLock = new Object();
 
 
     /**
@@ -105,24 +116,54 @@ public class BookApp {
     public record BookList(ArrayList<Book> books) { }
 
     /**
-     * AI基础对话
+     * AI基础对话（带缓存和防重复）
      * @param message 用户消息
      * @param conversationId 会话ID
      * @return AI回复
      */
-    public String doChatWithBookList(String message, String conversationId){
-        BookList bookList = chatClient
-                .prompt()
-                // .system(systemPromptTemplate.getTemplate() + "每次都需要生成一个标题为{用户名}的书籍推荐总结，内容为书籍列表")
-                .user(message)
-                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
-                .call()
-                .entity(BookList.class);
+    public String doChatWithBookList(String message, String conversationId) {
+        log.debug("Processing BookApp chat request - Conversation: {}, Message: {}",
+                 conversationId, message.substring(0, Math.min(50, message.length())));
 
-        if (bookList != null){
-            return bookList.books().stream().map(book -> book.name() + " by " + book.author() + ": " + book.summary()).collect(Collectors.joining("\n"));
+        // 生成缓存键
+        String cacheKey = generateCacheKey("booklist", conversationId, message);
+
+        // 检查缓存
+        String cachedResponse = cacheManager.get(cacheKey, String.class);
+        if (cachedResponse != null) {
+            log.info("Cache hit for BookApp request - Conversation: {}", conversationId);
+            return cachedResponse;
         }
-        return null;
+
+        try {
+            BookList bookList = chatClient
+                    .prompt()
+                    // .system(systemPromptTemplate.getTemplate() + "每次都需要生成一个标题为{用户名}的书籍推荐总结，内容为书籍列表")
+                    .user(message)
+                    .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                    .call()
+                    .entity(BookList.class);
+
+            if (bookList != null) {
+                String response = bookList.books().stream()
+                        .map(book -> book.name() + " by " + book.author() + ": " + book.summary())
+                        .collect(Collectors.joining("\n"));
+
+                // 缓存响应结果（15分钟）
+                cacheManager.put(cacheKey, response, 15);
+
+                log.info("BookApp chat completed successfully - Conversation: {}, Books: {}",
+                        conversationId, bookList.books().size());
+                return response;
+            }
+
+            log.warn("BookApp returned null response - Conversation: {}", conversationId);
+            return "抱歉，我暂时无法处理您的请求。";
+
+        } catch (Exception e) {
+            log.error("Error in BookApp chat - Conversation: {}", conversationId, e);
+            return "处理您的请求时遇到了错误：" + e.getMessage();
+        }
     }
 
 /*    @jakarta.annotation.Resource
@@ -234,12 +275,86 @@ public class BookApp {
         return chatResponse.getResult().getOutput().getText();
     }
 
-    public Flux<String> doChatByStream(String message, String conversationId){
+    /**
+     * 流式对话（带防重复和连接管理）
+     * @param message 用户消息
+     * @param conversationId 会话ID
+     * @return 流式响应
+     */
+    public Flux<String> doChatByStream(String message, String conversationId) {
+        log.debug("Starting BookApp stream - Conversation: {}, Message: {}",
+                 conversationId, message.substring(0, Math.min(50, message.length())));
+
+        String streamKey = conversationId + "_" + message.hashCode();
+
+        synchronized (streamLock) {
+            // 检查是否已有相同的流式请求在进行
+            if (activeStreamRequests.contains(streamKey)) {
+                log.warn("Duplicate stream request detected for conversation: {}", conversationId);
+                return Flux.error(new RuntimeException("Duplicate stream request detected. Please wait for the current request to complete."));
+            }
+
+            activeStreamRequests.add(streamKey);
+        }
+
         return chatClient.prompt()
                 .user(message)
                 .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .advisors(new MyLoggerAdvisor())
                 .stream()
-                .content();
+                .content()
+                .doOnNext(chunk -> log.debug("Stream chunk for conversation {}: {}",
+                        conversationId, chunk.substring(0, Math.min(30, chunk.length()))))
+                .doOnComplete(() -> {
+                    log.info("BookApp stream completed for conversation: {}", conversationId);
+                    synchronized (streamLock) {
+                        activeStreamRequests.remove(streamKey);
+                    }
+                })
+                .doOnError(error -> {
+                    log.error("BookApp stream error for conversation: {}", conversationId, error);
+                    synchronized (streamLock) {
+                        activeStreamRequests.remove(streamKey);
+                    }
+                })
+                .doOnCancel(() -> {
+                    log.info("BookApp stream cancelled for conversation: {}", conversationId);
+                    synchronized (streamLock) {
+                        activeStreamRequests.remove(streamKey);
+                    }
+                });
+    }
+
+    /**
+     * 生成缓存键
+     */
+    private String generateCacheKey(String type, String conversationId, String message) {
+        try {
+            // 使用消息内容的哈希值生成缓存键
+            String content = type + ":" + conversationId + ":" + message.toLowerCase().trim();
+            byte[] hash = java.security.MessageDigest.getInstance("MD5").digest(content.getBytes());
+            return java.util.Base64.getEncoder().encodeToString(hash).substring(0, 12);
+        } catch (Exception e) {
+            log.warn("Failed to generate cache key, using fallback", e);
+            return type + "_" + conversationId + "_" + Math.abs(message.hashCode());
+        }
+    }
+
+    /**
+     * 清理指定会话的缓存
+     */
+    public void clearConversationCache(String conversationId) {
+        log.info("Clearing cache for conversation: {}", conversationId);
+        // 这里可以实现具体的缓存清理逻辑
+        // 由于当前的缓存管理器没有基于模式的清理，这个方法预留用于未来扩展
+    }
+
+    /**
+     * 获取活跃的流式请求数量
+     */
+    public int getActiveStreamRequestCount() {
+        synchronized (streamLock) {
+            return activeStreamRequests.size();
+        }
     }
 }

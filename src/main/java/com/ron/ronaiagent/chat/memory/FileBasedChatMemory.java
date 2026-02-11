@@ -15,23 +15,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class FileBasedChatMemory implements ChatMemory {
-    private String BASE_DIR;
+
+    private final String baseDir;
     private static final Kryo KRYO = new Kryo();
 
     static {
-        // 允许未注册的类
         KRYO.setRegistrationRequired(false);
-        // 设置实例化策略
         KRYO.setInstantiatorStrategy(new StdInstantiatorStrategy());
     }
 
     public FileBasedChatMemory(String baseDir) {
-        this.BASE_DIR = baseDir;
-        File file = new File(BASE_DIR);
-        if (!file.exists()){
+        this.baseDir = baseDir;
+        File file = new File(baseDir);
+        if (!file.exists()) {
             file.mkdirs();
         }
     }
+
     @Override
     public void add(@NotNull String conversationId, @NotNull Message message) {
         List<Message> messageList = getOrCreateConversation(conversationId);
@@ -41,7 +41,12 @@ public class FileBasedChatMemory implements ChatMemory {
 
     @Override
     public void add(@NotNull String conversationId, @NotNull List<Message> messages) {
-
+        if (messages.isEmpty()) {
+            return;
+        }
+        List<Message> messageList = getOrCreateConversation(conversationId);
+        messageList.addAll(messages);
+        saveConversation(conversationId, messageList);
     }
 
     @NotNull
@@ -50,12 +55,6 @@ public class FileBasedChatMemory implements ChatMemory {
         return getOrCreateConversation(conversationId);
     }
 
-    /**
-     * 获取会话
-     * @param conversationId 会话ID
-     * @param lastN 获取最后N条消息
-     * @return 会话
-     */
     public List<Message> get(String conversationId, int lastN) {
         List<Message> allMessages = getOrCreateConversation(conversationId);
         return allMessages.stream()
@@ -66,46 +65,35 @@ public class FileBasedChatMemory implements ChatMemory {
     @Override
     public void clear(@NotNull String conversationId) {
         File conversationFile = getConversationFile(conversationId);
-        if (conversationFile.exists()){
+        if (conversationFile.exists()) {
             conversationFile.delete();
         }
-
     }
 
-    /**
-     * 获取会话
-     * @param conversationId 会话ID
-     * @return 会话
-     */
-    public List<Message> getOrCreateConversation(String conversationId){
+    @SuppressWarnings("unchecked")
+    public List<Message> getOrCreateConversation(String conversationId) {
         File conversationFile = getConversationFile(conversationId);
-        List<Message> messages = new ArrayList<>();
-
-        if (conversationFile.exists()){
-            try(Input input = new Input(new FileInputStream(conversationFile))) {
-                KRYO.readObject(input, ArrayList.class);
+        if (conversationFile.exists()) {
+            try (Input input = new Input(new FileInputStream(conversationFile))) {
+                List<Message> saved = KRYO.readObject(input, ArrayList.class);
+                return saved != null ? saved : new ArrayList<>();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
-        return messages;
+        return new ArrayList<>();
     }
 
-    /**
-     * 保存会话
-     * @param conversationId 会话ID
-     * @param messages 会话
-     */
-    public void saveConversation(String conversationId, List<Message> messages){
+    public void saveConversation(String conversationId, List<Message> messages) {
         File conversationFile = getConversationFile(conversationId);
-        try(Output output = new Output(new FileOutputStream(conversationFile))) {
+        try (Output output = new Output(new FileOutputStream(conversationFile))) {
             KRYO.writeObject(output, messages);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    private File getConversationFile(String conversationId){
-        return new File(BASE_DIR, conversationId + ".kryo");
+    private File getConversationFile(String conversationId) {
+        return new File(baseDir, conversationId + ".kryo");
     }
 }

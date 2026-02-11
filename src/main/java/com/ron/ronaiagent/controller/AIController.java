@@ -14,12 +14,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.constraints.NotBlank;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
@@ -38,6 +40,7 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @RestController
 @RequestMapping("/ai")
+@Validated
 @Tag(name = "AI智能助手", description = "AI聊天和智能助手相关接口")
 public class AIController {
     @Resource
@@ -82,9 +85,9 @@ public class AIController {
     })
     public ResponseEntity<String> doChatWithBookAppSync(
             @Parameter(description = "用户消息内容", required = true)
-            @RequestParam String message,
+            @RequestParam @NotBlank String message,
             @Parameter(description = "会话ID，用于上下文管理", required = true)
-            @RequestParam String conversationId,
+            @RequestParam @NotBlank String conversationId,
             @RequestHeader(value = "X-Client-ID", required = false) String clientId) {
 
         log.info("Received sync chat request - Conversation: {}, Message: {}", conversationId, message.substring(0, Math.min(100, message.length())));
@@ -174,9 +177,9 @@ public class AIController {
     })
     public Flux<ServerSentEvent<String>> doChatWithBookAppStream(
             @Parameter(description = "用户消息内容", required = true)
-            @RequestParam String message,
+            @RequestParam @NotBlank String message,
             @Parameter(description = "会话ID，用于上下文管理", required = true)
-            @RequestParam String conversationId,
+            @RequestParam @NotBlank String conversationId,
             @RequestHeader(value = "X-Client-ID", required = false) String clientId) {
 
         log.info("Received stream chat request - Conversation: {}, Message: {}", conversationId, message.substring(0, Math.min(100, message.length())));
@@ -255,9 +258,9 @@ public class AIController {
     })
     public SseEmitter doChatWithBookAppStreamEmitter(
             @Parameter(description = "用户消息内容", required = true)
-            @RequestParam String message,
+            @RequestParam @NotBlank String message,
             @Parameter(description = "会话ID，用于上下文管理", required = true)
-            @RequestParam String conversationId,
+            @RequestParam @NotBlank String conversationId,
             @RequestHeader(value = "X-Client-ID", required = false) String clientId) {
 
         log.info("Received SSE stream chat request - Conversation: {}, Message: {}", conversationId, message.substring(0, Math.min(100, message.length())));
@@ -363,7 +366,7 @@ public class AIController {
     })
     public SseEmitter doChatWithRonManus(
         @Parameter(description = "用户消息内容", required = true)
-        @RequestParam String message,
+        @RequestParam @NotBlank String message,
         @RequestHeader(value = "X-Client-ID", required = false) String clientId) {
 
         log.info("Received RonManus chat request - Message: {}", message.substring(0, Math.min(100, message.length())));

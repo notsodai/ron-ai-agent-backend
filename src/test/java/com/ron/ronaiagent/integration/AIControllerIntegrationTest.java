@@ -260,13 +260,13 @@ public class AIControllerIntegrationTest {
                         .param("message", "")
                         .param("conversationId", "validation-test")
                         .header("X-Client-ID", "validation-client"))
-                .andExpect(status().is5xxServerError()); // 根据实际实现调整
+                .andExpect(status().isBadRequest());
 
         // 测试空会话ID
         mockMvc.perform(get("/ai/book/chat/sync")
                         .param("message", "测试消息")
                         .param("conversationId", "")
                         .header("X-Client-ID", "validation-client"))
-                .andExpect(status().is5xxServerError()); // 根据实际实现调整
+                .andExpect(status().isBadRequest());
     }
 }

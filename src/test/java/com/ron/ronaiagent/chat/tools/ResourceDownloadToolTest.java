@@ -2,20 +2,21 @@ package com.ron.ronaiagent.chat.tools;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * @author admin
- * @date 2025/9/14 下午3:09
- */
 class ResourceDownloadToolTest {
 
     @Test
-    void downloadResource() {
+    void downloadResourceShouldRejectPrivateAddress() {
         ResourceDownloadTool tool = new ResourceDownloadTool();
-        String url = "https://www.codefather.cn/logo.png";
-        String fileName = "logo.png";
-        String result = tool.downloadResource(url, fileName);
-        assertNotNull(result);
+        String result = tool.downloadResource("http://127.0.0.1:8080/a.txt", "a.txt");
+        assertTrue(result.startsWith("Error downloading resource:"));
+    }
+
+    @Test
+    void downloadResourceShouldRejectInvalidFileName() {
+        ResourceDownloadTool tool = new ResourceDownloadTool();
+        String result = tool.downloadResource("https://example.com/a.txt", "../a.txt");
+        assertTrue(result.startsWith("Error downloading resource:"));
     }
 }

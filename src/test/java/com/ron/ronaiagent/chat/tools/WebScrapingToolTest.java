@@ -1,22 +1,22 @@
 package com.ron.ronaiagent.chat.tools;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * @author admin
- * @date 2025/9/14 下午3:06
- */
-@SpringBootTest
 class WebScrapingToolTest {
 
     @Test
-    void scrapeWebPage() {
+    void scrapeWebPageShouldRejectPrivateAddress() {
         WebScrapingTool tool = new WebScrapingTool();
-        String url = "https://movie.douban.com/";
-        String result = tool.scrapeWebPage(url);
-        assertNotNull(result);
+        String result = tool.scrapeWebPage("http://127.0.0.1:8080");
+        assertTrue(result.startsWith("Error scraping web page:"));
+    }
+
+    @Test
+    void scrapeWebPageShouldRejectUnsupportedScheme() {
+        WebScrapingTool tool = new WebScrapingTool();
+        String result = tool.scrapeWebPage("file:///tmp/a.html");
+        assertTrue(result.startsWith("Error scraping web page:"));
     }
 }

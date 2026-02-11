@@ -2,25 +2,21 @@ package com.ron.ronaiagent.chat.tools;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * @author admin
- * @date 2025/9/14 下午2:45
- */
 class FileOperationToolTest {
 
     @Test
-    void readFile() {
+    void writeFileShouldRejectTraversalName() {
         FileOperationTool fileOperationTool = new FileOperationTool();
-        String result = fileOperationTool.readFile("test.txt");
-        assertNotNull(result);
+        String result = fileOperationTool.writeFile("../test.txt", "Hello");
+        assertTrue(result.startsWith("Error writing to file:"));
     }
 
     @Test
-    void writeFile() {
+    void readFileShouldRejectTraversalName() {
         FileOperationTool fileOperationTool = new FileOperationTool();
-        String result = fileOperationTool.writeFile("test.txt", "Hello World!");
-        assertNotNull(result);
+        String result = fileOperationTool.readFile("../test.txt");
+        assertTrue(result.startsWith("Error reading file:"));
     }
 }

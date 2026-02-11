@@ -65,7 +65,7 @@ public class BookApp {
             return reader.lines().collect(Collectors.joining("\n"));
         } catch (IOException e) {
             // 记录错误日志
-            System.err.println("Failed to load system prompt: " + e.getMessage());
+            log.error("Failed to load system prompt", e);
             return ""; // 返回默认值
         }
     }

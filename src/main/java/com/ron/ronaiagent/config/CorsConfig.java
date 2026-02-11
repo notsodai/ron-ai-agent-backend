@@ -1,31 +1,26 @@
 package com.ron.ronaiagent.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * @author admin
- * @date 2025/11/3 下午10:05
- * 描述：CORS 配置
- */
+import java.util.List;
+
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
+
+    @Value("${app.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000}")
+    private List<String> allowedOrigins;
+
     @Override
-    public void addCorsMappings(CorsRegistry  registry){
-        // 允许所有请求
+    public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                // 允许所有来源
-                .allowedOriginPatterns("*")
-                // 允许所有方法
+                .allowedOrigins(allowedOrigins.toArray(new String[0]))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")
-                // 允许发送 Cookie
                 .allowCredentials(true)
-                // 允许所有头
                 .allowedHeaders("*")
-                // 允许跨域
                 .exposedHeaders("*")
-                // 缓存 1 天
-                .maxAge(360000);
+                .maxAge(3600);
     }
 }

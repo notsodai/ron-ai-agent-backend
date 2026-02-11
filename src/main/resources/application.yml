@@ -42,3 +42,9 @@ knife4j:
   enable: true
   setting:
     language: zh_cn
+
+app:
+  admin:
+    token: ${APP_ADMIN_TOKEN:change-me-in-prod}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}

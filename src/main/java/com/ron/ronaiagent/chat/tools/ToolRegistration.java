@@ -6,27 +6,55 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * @author admin
- * @date 2025/9/14 下午3:16
- */
 @Configuration
 public class ToolRegistration {
-    @Value("${spring.search-api.api-key}")
-    private String searchApiKey;
 
     @Bean
-    public ToolCallback[] allTools() {
+    public FileOperationTool fileOperationTool() {
+        return new FileOperationTool();
+    }
 
-        FileOperationTool fileOperationTool = new FileOperationTool();
-        PDFGenerationTool pdfGenerationTool = new PDFGenerationTool();
-        ResourceDownloadTool resourceDownloadTool = new ResourceDownloadTool();
-        WebScrapingTool webScrapingTool = new WebScrapingTool();
-        WebSearchTool webSearchTool = new WebSearchTool(searchApiKey);
-        ImageSearchTool imageSearchTool = new ImageSearchTool();
-        TerminateTool terminateTool = new TerminateTool();
+    @Bean
+    public PDFGenerationTool pdfGenerationTool() {
+        return new PDFGenerationTool();
+    }
 
-        return ToolCallbacks.from(fileOperationTool, pdfGenerationTool, resourceDownloadTool, webScrapingTool, webSearchTool, imageSearchTool, terminateTool);
+    @Bean
+    public ResourceDownloadTool resourceDownloadTool() {
+        return new ResourceDownloadTool();
+    }
 
+    @Bean
+    public WebScrapingTool webScrapingTool() {
+        return new WebScrapingTool();
+    }
+
+    @Bean
+    public WebSearchTool webSearchTool(@Value("${spring.search-api.api-key:}") String searchApiKey) {
+        return new WebSearchTool(searchApiKey);
+    }
+
+    @Bean
+    public TerminateTool terminateTool() {
+        return new TerminateTool();
+    }
+
+    @Bean
+    public ToolCallback[] allTools(
+            FileOperationTool fileOperationTool,
+            PDFGenerationTool pdfGenerationTool,
+            ResourceDownloadTool resourceDownloadTool,
+            WebScrapingTool webScrapingTool,
+            WebSearchTool webSearchTool,
+            ImageSearchTool imageSearchTool,
+            TerminateTool terminateTool) {
+        return ToolCallbacks.from(
+                fileOperationTool,
+                pdfGenerationTool,
+                resourceDownloadTool,
+                webScrapingTool,
+                webSearchTool,
+                imageSearchTool,
+                terminateTool);
     }
 }

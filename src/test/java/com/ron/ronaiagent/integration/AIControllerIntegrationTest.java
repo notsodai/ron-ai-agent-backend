@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * AI控制器集成测试
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.admin.token=test-admin-token")
 @AutoConfigureWebMvc
 public class AIControllerIntegrationTest {
 
@@ -215,7 +215,8 @@ public class AIControllerIntegrationTest {
         assertTrue(statsBefore.getSize() > 0);
 
         // 清理缓存
-        mockMvc.perform(post("/ai/cache/clear"))
+        mockMvc.perform(post("/ai/cache/clear")
+                        .header("X-Admin-Token", "test-admin-token"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Cache cleared successfully"));
 
@@ -227,7 +228,8 @@ public class AIControllerIntegrationTest {
     @Test
     @DisplayName("测试重置客户端限流接口")
     void testResetClientRateLimitEndpoint() throws Exception {
-        mockMvc.perform(post("/ai/rate-limit/reset/test-reset-client"))
+        mockMvc.perform(post("/ai/rate-limit/reset/test-reset-client")
+                        .header("X-Admin-Token", "test-admin-token"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Rate limit counters reset for client: test-reset-client"));
 

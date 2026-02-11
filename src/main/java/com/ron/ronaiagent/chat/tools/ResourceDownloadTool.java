@@ -7,21 +7,22 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
 import java.io.File;
+import java.net.URI;
+import java.nio.file.Path;
 
-/**
- * @author admin
- * @date 2025/9/14 下午3:08
- */
 public class ResourceDownloadTool {
+
+    private static final String DOWNLOAD_DIR = FileConstant.FILE_SAVE_DIR + "/download";
+
     @Tool(description = "Download a resource from a given URL")
-    public String downloadResource(@ToolParam(description = "URL of the resource to download") String url, @ToolParam(description = "Name of the file to save the downloaded resource") String fileName) {
-        String fileDir = FileConstant.FILE_SAVE_DIR + "/download";
-        String filePath = fileDir + "/" + fileName;
+    public String downloadResource(
+            @ToolParam(description = "URL of the resource to download") String url,
+            @ToolParam(description = "Name of the file to save the downloaded resource") String fileName) {
         try {
-            // 创建目录
-            FileUtil.mkdir(fileDir);
-            // 使用 Hutool 的 downloadFile 方法下载资源
-            HttpUtil.downloadFile(url, new File(filePath));
+            URI safeUri = ToolSecurityUtils.validatePublicHttpUrl(url);
+            FileUtil.mkdir(DOWNLOAD_DIR);
+            Path filePath = ToolSecurityUtils.resolveSafePath(DOWNLOAD_DIR, fileName);
+            HttpUtil.downloadFile(safeUri.toString(), new File(filePath.toString()));
             return "Resource downloaded successfully to: " + filePath;
         } catch (Exception e) {
             return "Error downloading resource: " + e.getMessage();

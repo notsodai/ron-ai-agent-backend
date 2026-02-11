@@ -324,12 +324,12 @@ public class AIController {
                     deduplicationManager.cancelRequest(requestKey);
                 }, () -> {
                     log.info("SSE stream completed for conversation: {}", conversationId);
-                    sseEmitter.complete();
                     try {
                         sseEmitter.send("[DONE]");
                     } catch (Exception e) {
                         log.debug("Error sending completion marker", e);
                     }
+                    sseEmitter.complete();
                     deduplicationManager.markRequestCompleted(requestKey, false);
                 });
 

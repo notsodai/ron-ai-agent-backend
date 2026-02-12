@@ -1,0 +1,28 @@
+spring:
+  application:
+    name:
+      ron-ai-agent
+  ai:
+    dashscope:
+      api-key: sk-a811a0e2d1504f73ae36b6146ddce18e
+
+  datasource:
+    url: jdbc:postgresql://pgm-bp166yyy54629dc6do.rwlb.rds.aliyuncs.com/ron_ai_agent
+    username: ron
+    password: ron123!@#
+
+  search_api:
+    api-key: hYJfQRqFC6tRqTAPPMkM6DZx
+
+# Multi-Agent Configuration
+agent:
+  file:
+    base-directory: ${FILE_BASE_DIR:/tmp/ron-agent-files}
+  coordination:
+    default-timeout-seconds: 300
+    max-parallel-agents: 10
+  messaging:
+    enable-message-history: true
+    message-history-limit: 100
+
+

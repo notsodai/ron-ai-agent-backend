@@ -28,15 +28,15 @@ import java.util.stream.Collectors;
 @EqualsAndHashCode(callSuper = true)
 public abstract class ToolCallAgent extends ReActAgent {
     /**
-     * 可用工具列表
+     * Available tools list.
      */
     private ToolCallback[] availableTools;
     /**
-     * 工具调用结果
+     * Tool call results.
      */
     private ChatResponse toolCallResponse;
     /**
-     * 工具调用管理器
+     * Tool calling manager.
      */
     private final ToolCallingManager toolCallingManager;
     /**
@@ -112,8 +112,8 @@ public abstract class ToolCallAgent extends ReActAgent {
             // 记录消息上下文
             setMessages(toolExecutionResult.conversationHistory());
 
-            // 安全地获取工具响应消息
-            List<Message> conversationHistory = toolExecutionResult.conversationHistory();
+            // Record conversation history
+        List<Message> conversationHistory = toolExecutionResult.conversationHistory();
             if (!conversationHistory.isEmpty() && conversationHistory.getLast() instanceof ToolResponseMessage toolResponseMessage) {
 
                 // 处理工具响应

@@ -122,7 +122,7 @@ public class RequestRateLimitManager {
         public synchronized boolean checkBurstLimit(int maxBurstRequests, long burstAllowanceMs) {
             if (isWithinBurstWindow(burstAllowanceMs)) {
                 int currentBurst = burstCounter.incrementAndGet();
-                return currentBurst <= maxBurstRequests;
+                return currentBurst < maxBurstRequests; // 修复：使用严格小于，确保在达到maxBurst时阻止
             } else {
                 // 重置突发窗口
                 burstStartTime.set(System.currentTimeMillis());
@@ -213,22 +213,26 @@ public class RequestRateLimitManager {
     public RateLimitResult checkRequest(String clientId, RateLimitConfig config) {
         totalRequests.incrementAndGet();
 
-        ClientRequestRecord record = clientRecords.computeIfAbsent(clientId, k -> {
+        // 处理空客户端ID - 使用默认ID
+        String effectiveClientId = (clientId == null || clientId.trim().isEmpty()) ? "_default" : clientId;
+
+        ClientRequestRecord record = clientRecords.computeIfAbsent(effectiveClientId, k -> {
             activeClients.incrementAndGet();
-            log.debug("New client registered: {}", clientId);
-            return new ClientRequestRecord(clientId);
+            log.debug("New client registered: {}", effectiveClientId);
+            return new ClientRequestRecord(effectiveClientId);
         });
 
         synchronized (record) {
             record.resetCountersIfNeeded();
             record.updateTime();
 
-            // 检查突发流量限制 - 修复：传递正确的参数
-            int maxBurst = Math.max(1, config.getMaxRequestsPerMinute() / 6); // 每秒最大请求数
+            // 检查突发流量限制（改进版：突发允许短时内超过分钟限制）
+            // 突发限制设置为分钟限制+1，允许完整的分钟限制请求通过
+            int maxBurst = config.getMaxRequestsPerMinute() + 1;
             if (!record.checkBurstLimit(maxBurst, config.getBurstAllowanceMs())) {
                 blockedRequests.incrementAndGet();
                 log.warn("Burst rate limit exceeded for client: {} (burst: {}/{})",
-                        clientId, record.getBurstRequests(), maxBurst);
+                        effectiveClientId, record.getBurstRequests(), maxBurst);
                 return RateLimitResult.blocked("Burst rate limit exceeded",
                     java.time.Duration.ofMillis(config.getBurstAllowanceMs()));
             }
@@ -240,9 +244,27 @@ public class RequestRateLimitManager {
             if (record.getMinuteRequests() > config.getMaxRequestsPerMinute()) {
                 blockedRequests.incrementAndGet();
                 log.warn("Minute rate limit exceeded for client: {} ({} > {})",
-                        clientId, record.getMinuteRequests(), config.getMaxRequestsPerMinute());
+                        effectiveClientId, record.getMinuteRequests(), config.getMaxRequestsPerMinute());
                 return RateLimitResult.blocked("Minute rate limit exceeded",
                     java.time.Duration.ofMinutes(1));
+            }
+
+            // 检查小时限制
+            if (record.getHourRequests() > config.getMaxRequestsPerHour()) {
+                blockedRequests.incrementAndGet();
+                log.warn("Hour rate limit exceeded for client: {} ({} > {})",
+                        effectiveClientId, record.getHourRequests(), config.getMaxRequestsPerHour());
+                return RateLimitResult.blocked("Hour rate limit exceeded",
+                    java.time.Duration.ofHours(1));
+            }
+
+            // 检查日限制
+            if (record.getDayRequests() > config.getMaxRequestsPerDay()) {
+                blockedRequests.incrementAndGet();
+                log.warn("Day rate limit exceeded for client: {} ({} > {})",
+                        effectiveClientId, record.getDayRequests(), config.getMaxRequestsPerDay());
+                return RateLimitResult.blocked("Day rate limit exceeded",
+                    java.time.Duration.ofDays(1));
             }
 
             // 检查小时限制

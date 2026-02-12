@@ -126,8 +126,8 @@ public class RequestDeduplicationManagerTest {
     void testExpiredRecords() throws InterruptedException {
         String requestKey = "test-key";
 
-        // 创建一个短TTL的请求记录
-        manager.checkAndRecordRequest(requestKey, 1/60); // 1分钟，但通过除法实现
+        // 创建一个短TTL的请求记录（1分钟）
+        manager.checkAndRecordRequest(requestKey, 1L);
 
         // 等待一段时间
         Thread.sleep(100);

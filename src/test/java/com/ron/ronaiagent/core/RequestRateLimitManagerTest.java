@@ -43,14 +43,14 @@ public class RequestRateLimitManagerTest {
         // 发送限制内的请求
         for (int i = 0; i < testConfig.getMaxRequestsPerMinute(); i++) {
             RequestRateLimitManager.RateLimitResult result = manager.checkRequest(clientId, testConfig);
-            assertTrue("Request " + i + " should be allowed", result.isAllowed());
+            assertTrue(result.isAllowed(), "Request " + i + " should be allowed");
         }
 
         // 下一个请求应该被限制
         RequestRateLimitManager.RateLimitResult result = manager.checkRequest(clientId, testConfig);
         assertFalse(result.isAllowed());
         assertEquals("Minute rate limit exceeded", result.getReason());
-        assertEquals(60, result.getRetryAfter().toMinutes());
+        assertEquals(1, result.getRetryAfter().toMinutes()); // 修复：分钟限制应该等待1分钟，不是60分钟
     }
 
     @Test
@@ -73,13 +73,13 @@ public class RequestRateLimitManagerTest {
         String clientId = "test-client-burst";
 
         // 在突发窗口内快速发送请求
-        for (int i = 0; i < 6; i++) { // 超过突发限制（5个请求）
+        for (int i = 0; i < 6; i++) { // 发送6个请求
             RequestRateLimitManager.RateLimitResult result = manager.checkRequest(clientId, testConfig);
 
             if (i < 5) {
-                assertTrue("Burst request " + i + " should be allowed", result.isAllowed());
+                assertTrue(result.isAllowed(), "Burst request " + i + " should be allowed");
             } else {
-                assertFalse("Burst request " + i + " should be blocked", result.isAllowed());
+                assertFalse(result.isAllowed(), "Burst request " + i + " should be blocked");
                 assertEquals("Burst rate limit exceeded", result.getReason());
             }
         }
@@ -103,6 +103,9 @@ public class RequestRateLimitManagerTest {
     @DisplayName("测试客户端统计")
     void testClientStats() {
         String clientId = "test-client-stats";
+
+        // 设置客户端特定配置，确保统计使用正确的限制
+        manager.setClientConfig(clientId, testConfig);
 
         // 发送一些请求
         for (int i = 0; i < 3; i++) {
@@ -143,6 +146,9 @@ public class RequestRateLimitManagerTest {
     @DisplayName("测试重置客户端计数器")
     void testResetClientCounters() {
         String clientId = "test-client-reset";
+
+        // 设置客户端特定配置
+        manager.setClientConfig(clientId, testConfig);
 
         // 发送一些请求
         for (int i = 0; i < 3; i++) {

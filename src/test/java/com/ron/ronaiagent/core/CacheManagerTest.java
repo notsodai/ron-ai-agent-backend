@@ -122,10 +122,10 @@ public class CacheManagerTest {
         String stringKey = "string-key";
         String stringValue = "test string";
 
-        Integer intKey = "int-key";
+        String intKey = "int-key";
         Integer intValue = 123;
 
-        CustomObject objectKey = "object-key";
+        String objectKey = "object-key";
         CustomObject objectValue = new CustomObject("test", 456);
 
         // 测试字符串

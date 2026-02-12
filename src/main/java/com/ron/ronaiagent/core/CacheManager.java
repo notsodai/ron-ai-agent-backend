@@ -101,6 +101,7 @@ public class CacheManager {
 
             cache.put(key, entry);
             addToHead(key);
+            entry.recordAccess(); // 记录初始访问，使hitCount从1开始
 
             return entry;
         }
@@ -239,12 +240,15 @@ public class CacheManager {
     public <T> T get(String key, Class<T> type) {
         totalRequests.incrementAndGet();
 
-        CacheEntry<Object> entry = lruCache.getEntry(key);
+        CacheEntry<Object> entry = lruCache.get(key);
         if (entry == null) {
             cacheMisses.incrementAndGet();
             log.debug("Cache miss for key: {}", key);
             return null;
         }
+
+        // 缓存命中，递增命中计数器
+        cacheHits.incrementAndGet();
 
         try {
             Object value = entry.getValue();

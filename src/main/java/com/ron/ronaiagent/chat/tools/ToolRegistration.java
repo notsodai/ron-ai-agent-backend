@@ -30,7 +30,7 @@ public class ToolRegistration {
     }
 
     @Bean
-    public WebSearchTool webSearchTool(@Value("${spring.search-api.api-key:}") String searchApiKey) {
+    public WebSearchTool webSearchTool(@Value("${spring.search_api.api-key:}") String searchApiKey) {
         return new WebSearchTool(searchApiKey);
     }
 
@@ -46,7 +46,6 @@ public class ToolRegistration {
             ResourceDownloadTool resourceDownloadTool,
             WebScrapingTool webScrapingTool,
             WebSearchTool webSearchTool,
-            ImageSearchTool imageSearchTool,
             TerminateTool terminateTool) {
         return ToolCallbacks.from(
                 fileOperationTool,
@@ -54,7 +53,6 @@ public class ToolRegistration {
                 resourceDownloadTool,
                 webScrapingTool,
                 webSearchTool,
-                imageSearchTool,
                 terminateTool);
     }
 }

@@ -46,14 +46,7 @@ public class AgentConfiguration {
     }
 
     /**
-     * Creates and configures the FileProcessingAgent bean
-     *
-     * @param allTools Auto-registered tool callbacks from ToolRegistration
-     * @param dashScopeChatModel ChatModel for LLM interactions
-     * @return Configured FileProcessingAgent instance
+     * FileProcessingAgent is now defined in MultiAgentConfig
+     * This method is removed to avoid bean name conflicts
      */
-    @Bean
-    public FileProcessingAgent fileProcessingAgent(ToolCallback[] allTools, ChatModel dashScopeChatModel) {
-        return new FileProcessingAgent("file-processor", dashScopeChatModel, fileBaseDirectory, allTools);
-    }
 }

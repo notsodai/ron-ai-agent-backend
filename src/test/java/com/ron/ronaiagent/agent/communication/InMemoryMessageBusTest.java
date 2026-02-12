@@ -137,4 +137,199 @@ class InMemoryMessageBusTest {
         List<Message> history = messageBus.getMessageHistory("history-topic", 3);
         assertEquals(3, history.size());
     }
+
+    @Test
+    void testConcurrentPublish() throws InterruptedException {
+        int threadCount = 10;
+        int messagesPerThread = 100;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(threadCount);
+        AtomicInteger totalReceived = new AtomicInteger(0);
+
+        // Subscribe with a thread-safe counter
+        messageBus.subscribe("concurrent-topic", "collector", msg -> {
+            totalReceived.incrementAndGet();
+        });
+
+        // Create multiple threads publishing simultaneously
+        for (int i = 0; i < threadCount; i++) {
+            new Thread(() -> {
+                try {
+                    startLatch.await(); // Wait for all threads to be ready
+                    for (int j = 0; j < messagesPerThread; j++) {
+                        messageBus.publish("concurrent-topic", new Message.Builder()
+                            .from("sender").to("receiver").topic("concurrent-topic")
+                            .content("message-" + j).build());
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    endLatch.countDown();
+                }
+            }).start();
+        }
+
+        // Start all threads simultaneously
+        startLatch.countDown();
+
+        // Wait for all threads to complete
+        assertTrue(endLatch.await(10, TimeUnit.SECONDS),
+            "All threads should complete within timeout");
+
+        // Give handlers a moment to finish processing
+        Thread.sleep(100);
+
+        // Verify all messages were received
+        int expectedMessages = threadCount * messagesPerThread;
+        assertEquals(expectedMessages, totalReceived.get(),
+            "All messages should be received in concurrent environment");
+    }
+
+    @Test
+    void testPublishToNonExistentTopic() {
+        // Should not throw exception
+        assertDoesNotThrow(() -> {
+            messageBus.publish("non-existent-topic", new Message.Builder()
+                .from("agent1").to("agent2").topic("non-existent-topic")
+                .content("test").build());
+        });
+    }
+
+    @Test
+    void testUnsubscribeNonExistentSubscription() {
+        // Should not throw exception
+        assertDoesNotThrow(() -> {
+            messageBus.unsubscribe("non-existent-id");
+        });
+    }
+
+    @Test
+    void testPublishWithNullTopic() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            messageBus.publish(null, new Message.Builder()
+                .from("agent1").to("agent2").topic("test").content("test").build());
+        });
+    }
+
+    @Test
+    void testPublishWithNullMessage() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            messageBus.publish("test-topic", null);
+        });
+    }
+
+    @Test
+    void testBroadcastWithNullTopic() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            messageBus.broadcast(null, new Message.Builder()
+                .from("agent1").to("agent2").topic("test").content("test").build());
+        });
+    }
+
+    @Test
+    void testBroadcastWithNullMessage() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            messageBus.broadcast("test-topic", null);
+        });
+    }
+
+    @Test
+    void testSendDirectWithNullMessage() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            messageBus.sendDirect(null);
+        });
+    }
+
+    @Test
+    void testConcurrentSubscribeUnsubscribe() throws InterruptedException {
+        int threadCount = 5;
+        int operationsPerThread = 20;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(threadCount);
+        List<String> subscriptionIds = new ArrayList<>();
+
+        // Create threads that subscribe and unsubscribe concurrently
+        for (int i = 0; i < threadCount; i++) {
+            new Thread(() -> {
+                try {
+                    startLatch.await();
+                    for (int j = 0; j < operationsPerThread; j++) {
+                        String subId = messageBus.subscribe("concurrent-sub-topic",
+                            "agent" + j, msg -> {});
+                        synchronized (subscriptionIds) {
+                            subscriptionIds.add(subId);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    endLatch.countDown();
+                }
+            }).start();
+        }
+
+        startLatch.countDown();
+        assertTrue(endLatch.await(10, TimeUnit.SECONDS));
+
+        // Verify we have the expected number of subscriptions
+        assertEquals(threadCount * operationsPerThread, subscriptionIds.size());
+
+        // Now unsubscribe all concurrently
+        CountDownLatch unsubscribeLatch = new CountDownLatch(subscriptionIds.size());
+        for (String subId : subscriptionIds) {
+            new Thread(() -> {
+                try {
+                    messageBus.unsubscribe(subId);
+                } finally {
+                    unsubscribeLatch.countDown();
+                }
+            }).start();
+        }
+
+        assertTrue(unsubscribeLatch.await(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void testSendDirectQueuesForAllSubscribers() {
+        List<Message> receivedMessages = new ArrayList<>();
+
+        // Subscribe to the topic
+        messageBus.subscribe("direct-topic", "agent1", msg -> receivedMessages.add(msg));
+
+        // Send direct message to agent2
+        Message directMsg = new Message.Builder()
+            .from("sender")
+            .to("agent2")
+            .topic("direct-topic")
+            .content("Direct to agent2")
+            .build();
+
+        messageBus.sendDirect(directMsg);
+
+        // Topic subscriber should receive the message
+        assertEquals(1, receivedMessages.size());
+        assertEquals("Direct to agent2", receivedMessages.get(0).getContent());
+
+        // Message should be queued for both agent2 (recipient) and agent1 (subscriber)
+        List<Message> agent2Messages = messageBus.getMessagesForAgent("agent2");
+        List<Message> agent1Messages = messageBus.getMessagesForAgent("agent1");
+
+        assertEquals(1, agent2Messages.size());
+        assertEquals(1, agent1Messages.size());
+    }
+
+    @Test
+    void testHistoryTrimming() {
+        // Publish more messages than MAX_HISTORY_SIZE
+        for (int i = 0; i < 1500; i++) {
+            messageBus.publish("trim-topic", new Message.Builder()
+                .from("agent1").to("agent2").topic("trim-topic")
+                .content("message-" + i).build());
+        }
+
+        // History should be trimmed to MAX_HISTORY_SIZE
+        List<Message> history = messageBus.getMessageHistory("trim-topic", 2000);
+        assertTrue(history.size() <= 1000,
+            "History should not exceed max size");
+    }
 }

@@ -1,5 +1,7 @@
 package com.ron.ronaiagent.agent.communication;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -12,6 +14,9 @@ import java.util.stream.Collectors;
 @Component
 public class InMemoryMessageBus implements MessageBus {
 
+    private static final Logger logger = LoggerFactory.getLogger(InMemoryMessageBus.class);
+    private static final int MAX_HISTORY_SIZE = 1000;
+
     private final Map<String, List<Subscription>> topicSubscriptions = new ConcurrentHashMap<>();
     private final Map<String, Queue<Message>> agentMessageQueues = new ConcurrentHashMap<>();
     private final Map<String, List<Message>> topicHistory = new ConcurrentHashMap<>();
@@ -19,15 +24,31 @@ public class InMemoryMessageBus implements MessageBus {
 
     @Override
     public void publish(String topic, Message message) {
+        if (topic == null) {
+            throw new IllegalArgumentException("Topic cannot be null");
+        }
+        if (message == null) {
+            throw new IllegalArgumentException("Message cannot be null");
+        }
+
         addToHistory(topic, message);
 
         List<Subscription> subscribers = topicSubscriptions.get(topic);
         if (subscribers != null) {
-            subscribers.forEach(sub -> {
-                if (sub.handler != null) {
-                    sub.handler.accept(message);
+            // Create defensive snapshot to avoid race condition
+            new ArrayList<>(subscribers).forEach(sub -> {
+                // Verify subscription still exists before invoking handler
+                if (subscriptions.containsKey(sub.subscriptionId)) {
+                    try {
+                        if (sub.handler != null) {
+                            sub.handler.accept(message);
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error in message handler for subscription {}: {}",
+                            sub.subscriptionId, e.getMessage(), e);
+                    }
+                    queueMessage(sub.subscriberId, message);
                 }
-                queueMessage(sub.subscriberId, message);
             });
         }
     }
@@ -57,18 +78,32 @@ public class InMemoryMessageBus implements MessageBus {
 
     @Override
     public void sendDirect(Message message) {
+        if (message == null) {
+            throw new IllegalArgumentException("Message cannot be null");
+        }
+
         String topic = message.getTopic();
         addToHistory(topic, message);
 
         // Queue message for the specific recipient
         queueMessage(message.getTo(), message);
 
-        // Also notify subscribers if any
+        // Also notify subscribers if any (and queue for them too)
         List<Subscription> subscribers = topicSubscriptions.get(topic);
         if (subscribers != null) {
-            subscribers.forEach(sub -> {
-                if (sub.handler != null) {
-                    sub.handler.accept(message);
+            // Create defensive snapshot to avoid race condition
+            new ArrayList<>(subscribers).forEach(sub -> {
+                if (subscriptions.containsKey(sub.subscriptionId)) {
+                    try {
+                        if (sub.handler != null) {
+                            sub.handler.accept(message);
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error in message handler for subscription {}: {}",
+                            sub.subscriptionId, e.getMessage(), e);
+                    }
+                    // Also queue message for topic subscribers (consistent with publish)
+                    queueMessage(sub.subscriberId, message);
                 }
             });
         }
@@ -76,6 +111,12 @@ public class InMemoryMessageBus implements MessageBus {
 
     @Override
     public void broadcast(String topic, Message message) {
+        if (topic == null) {
+            throw new IllegalArgumentException("Topic cannot be null");
+        }
+        if (message == null) {
+            throw new IllegalArgumentException("Message cannot be null");
+        }
         publish(topic, message);
     }
 
@@ -101,7 +142,8 @@ public class InMemoryMessageBus implements MessageBus {
         }
 
         int startIndex = Math.max(0, history.size() - limit);
-        return new ArrayList<>(history.subList(startIndex, history.size()));
+        // Return unmodifiable subList to avoid double copy
+        return Collections.unmodifiableList(history.subList(startIndex, history.size()));
     }
 
     private void queueMessage(String agentId, Message message) {
@@ -110,8 +152,25 @@ public class InMemoryMessageBus implements MessageBus {
     }
 
     private void addToHistory(String topic, Message message) {
-        topicHistory.computeIfAbsent(topic, k -> new CopyOnWriteArrayList<>())
-            .add(message);
+        List<Message> history = topicHistory.computeIfAbsent(topic, k -> new CopyOnWriteArrayList<>());
+        history.add(message);
+
+        // Trim history if it exceeds max size to prevent unbounded memory growth
+        if (history.size() > MAX_HISTORY_SIZE) {
+            int elementsToRemove = history.size() - MAX_HISTORY_SIZE;
+            // Remove oldest messages (from the beginning)
+            if (history instanceof CopyOnWriteArrayList<?>) {
+                // CopyOnWriteArrayList doesn't support subList clear, so recreate
+                List<Message> trimmed = new ArrayList<>(history.subList(elementsToRemove, history.size()));
+                history.clear();
+                history.addAll(trimmed);
+            } else {
+                // For other list types, use subList clearing
+                history.subList(0, elementsToRemove).clear();
+            }
+            logger.debug("Trimmed message history for topic '{}' by {} messages to stay within limit of {}",
+                topic, elementsToRemove, MAX_HISTORY_SIZE);
+        }
     }
 
     private static class Subscription {
@@ -125,6 +184,19 @@ public class InMemoryMessageBus implements MessageBus {
             this.topic = topic;
             this.subscriberId = subscriberId;
             this.handler = handler;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Subscription that = (Subscription) o;
+            return Objects.equals(subscriptionId, that.subscriptionId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(subscriptionId);
         }
     }
 }

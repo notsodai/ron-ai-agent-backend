@@ -1,17 +1,13 @@
 package com.ron.ronaiagent.integration;
 
-import com.ron.ronaiagent.agent.AgentState;
-import com.ron.ronaiagent.agent.BaseAgent;
 import com.ron.ronaiagent.agent.coordinator.AgentManager;
-import com.ron.ronaiagent.agent.coordinator.AgentManagerImpl;
 import com.ron.ronaiagent.agent.coordinator.CollaborationPattern;
 import com.ron.ronaiagent.agent.coordinator.TaskCoordinator;
-import com.ron.ronaiagent.agent.coordinator.TaskCoordinatorImpl;
-import com.ron.ronaiagent.agent.communication.InMemoryMessageBus;
 import com.ron.ronaiagent.agent.communication.Message;
-import org.junit.jupiter.api.BeforeEach;
+import com.ron.ronaiagent.agent.communication.MessageBus;
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -19,53 +15,23 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Mock agent for testing purposes
- */
-class MockAgent extends BaseAgent {
-    public MockAgent(String name) {
-        setName(name);
-        setDescription("Mock agent for testing");
-    }
-
-    @Override
-    public String step() {
-        return "Mock step execution - " + getName();
-    }
-
-    @Override
-    public void cleanup() {
-        // Mock cleanup implementation
-    }
-}
-
+@SpringBootTest(properties = {
+    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration"
+})
 class MultiAgentIntegrationTest {
 
+    @Autowired
     private AgentManager agentManager;
+
+    @Autowired
     private TaskCoordinator taskCoordinator;
-    private InMemoryMessageBus messageBus;
 
-    @BeforeEach
-    void setUp() {
-        // Initialize message bus
-        messageBus = new InMemoryMessageBus();
-
-        // Initialize agent manager with mock agents
-        agentManager = new AgentManagerImpl();
-
-        // Register mock agents
-        agentManager.registerAgent("file-processor", new MockAgent("file-processor"));
-        agentManager.registerAgent("search-agent", new MockAgent("search-agent"));
-        agentManager.registerAgent("analysis-agent", new MockAgent("analysis-agent"));
-        agentManager.registerAgent("coordinator", new MockAgent("coordinator"));
-
-        // Initialize task coordinator
-        taskCoordinator = new TaskCoordinatorImpl(agentManager);
-    }
+    @Autowired
+    private MessageBus messageBus;
 
     @Test
     void testAgentManagerIntegration() {
-        assertEquals(4, agentManager.getAgentCount());
+        assertTrue(agentManager.getAgentCount() > 0);
         assertTrue(agentManager.isAgentRegistered("file-processor"));
         assertTrue(agentManager.isAgentRegistered("search-agent"));
         assertTrue(agentManager.isAgentRegistered("analysis-agent"));

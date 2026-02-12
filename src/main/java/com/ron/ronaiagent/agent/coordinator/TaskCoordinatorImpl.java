@@ -3,6 +3,7 @@ package com.ron.ronaiagent.agent.coordinator;
 import com.ron.ronaiagent.agent.BaseAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
  *
  * @author ron-ai-agent
  */
+@Component
 public class TaskCoordinatorImpl implements TaskCoordinator {
 
     private static final Logger log = LoggerFactory.getLogger(TaskCoordinatorImpl.class);

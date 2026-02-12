@@ -67,12 +67,14 @@ public class MultiAgentConfig {
      */
     @Bean
     public FileProcessingAgent fileProcessingAgent(ToolCallback[] allTools) {
-        return new FileProcessingAgent(
+        FileProcessingAgent agent = new FileProcessingAgent(
                 "file-processor",
                 chatModel,
                 fileBaseDirectory,
                 allTools
         );
+        agentManager.registerAgent("file-processor", agent);
+        return agent;
     }
 
     /**
@@ -86,11 +88,13 @@ public class MultiAgentConfig {
      */
     @Bean
     public SearchAgent searchAgent(ToolCallback[] allTools) {
-        return new SearchAgent(
+        SearchAgent agent = new SearchAgent(
                 "search-agent",
                 chatModel,
                 allTools
         );
+        agentManager.registerAgent("search-agent", agent);
+        return agent;
     }
 
     /**
@@ -104,11 +108,13 @@ public class MultiAgentConfig {
      */
     @Bean
     public AnalysisAgent analysisAgent(ToolCallback[] allTools) {
-        return new AnalysisAgent(
+        AnalysisAgent agent = new AnalysisAgent(
                 "analysis-agent",
                 chatModel,
                 allTools
         );
+        agentManager.registerAgent("analysis-agent", agent);
+        return agent;
     }
 
     /**
@@ -125,11 +131,13 @@ public class MultiAgentConfig {
      */
     @Bean
     public CoordinatorAgent coordinatorAgent(ToolCallback[] allTools) {
-        return new CoordinatorAgent(
+        CoordinatorAgent agent = new CoordinatorAgent(
                 "coordinator",
                 chatModel,
                 agentManager,
                 allTools
         );
+        agentManager.registerAgent("coordinator", agent);
+        return agent;
     }
 }

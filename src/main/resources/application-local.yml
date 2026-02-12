@@ -14,15 +14,9 @@ spring:
   search_api:
     api-key: hYJfQRqFC6tRqTAPPMkM6DZx
 
-# Multi-Agent Configuration
+# Agent Configuration
 agent:
   file:
-    base-directory: ${FILE_BASE_DIR:/tmp/ron-agent-files}
-  coordination:
-    default-timeout-seconds: 300
-    max-parallel-agents: 10
-  messaging:
-    enable-message-history: true
-    message-history-limit: 100
+    base-directory: ${agent.file.base-directory:/tmp/file-processing}
 
 

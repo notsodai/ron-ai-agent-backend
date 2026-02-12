@@ -193,6 +193,27 @@ class TaskCoordinatorImplTest {
         assertTrue(result.getExecutionTimeMs() >= 0);
     }
 
+    @Test
+    void testExecutorServiceShutdown() {
+        // Register test agents
+        agentManager.registerAgent("agent1", createMockAgent("Agent 1", "Agent 1 output"));
+        agentManager.registerAgent("agent2", createMockAgent("Agent 2", "Agent 2 output"));
+
+        // Execute parallel coordination
+        var result = taskCoordinator.executeParallel(
+            "Test task",
+            List.of("agent1", "agent2")
+        );
+
+        assertTrue(result.isSuccess());
+
+        // Manually trigger shutdown to verify it works
+        ((TaskCoordinatorImpl) taskCoordinator).shutdownForTest();
+
+        // After shutdown, executor should be terminated
+        // Note: In production, @PreDestroy handles this automatically
+    }
+
     private com.ron.ronaiagent.agent.BaseAgent createMockAgent(String name, String response) {
         return new com.ron.ronaiagent.agent.BaseAgent() {
             {

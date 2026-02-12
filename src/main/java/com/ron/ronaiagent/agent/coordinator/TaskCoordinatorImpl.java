@@ -3,13 +3,17 @@ package com.ron.ronaiagent.agent.coordinator;
 import com.ron.ronaiagent.agent.BaseAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -19,7 +23,7 @@ import java.util.stream.Collectors;
  * @author ron-ai-agent
  */
 @Component
-public class TaskCoordinatorImpl implements TaskCoordinator {
+public class TaskCoordinatorImpl implements TaskCoordinator, DisposableBean {
 
     private static final Logger log = LoggerFactory.getLogger(TaskCoordinatorImpl.class);
 
@@ -29,7 +33,7 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
     /**
      * Constructor for dependency injection.
      *
-     * @param agentManager the agent manager for agent lookup
+     * @param agentManager agent manager for agent lookup
      */
     public TaskCoordinatorImpl(AgentManager agentManager) {
         if (agentManager == null) {
@@ -104,7 +108,7 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
             // Collect worker results
-            Map<String, String> workerResults = new LinkedHashMap<>();
+            Map<String, String> workerResults = new java.util.LinkedHashMap<>();
             for (String workerId : workerAgentIds) {
                 agentManager.getAgent(workerId).ifPresent(worker -> {
                     // Use message history to get output
@@ -162,7 +166,7 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
 
         try {
             String currentTask = taskDescription;
-            Map<String, String> agentOutputs = new LinkedHashMap<>();
+            Map<String, String> agentOutputs = new java.util.LinkedHashMap<>();
 
             log.info("Starting chain coordination - Agents: {}, Steps: {}",
                     agentIds, agentIds.size());
@@ -185,7 +189,7 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
                           currentTask.substring(0, Math.min(50, currentTask.length())));
                 String result = agent.run(currentTask);
 
-                // Extract the last step output from the full result
+                // Extract last step output from full result
                 String lastStepOutput = extractLastStepOutput(result);
                 agentOutputs.put(agentId, lastStepOutput);
 
@@ -193,9 +197,9 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
                 currentTask = lastStepOutput; // Pass output to next agent
             }
 
-            // Final output is the last agent's output
+            // Final output is last agent's output
             String finalOutput = agentOutputs.isEmpty() ? "No output" :
-                new ArrayList<>(agentOutputs.values()).get(agentOutputs.size() - 1);
+                new java.util.ArrayList<>(agentOutputs.values()).get(agentOutputs.size() - 1);
 
             log.info("Chain coordination completed - Final output length: {}",
                     finalOutput.length());
@@ -266,7 +270,7 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
             // Aggregate results
-            Map<String, String> agentOutputs = new LinkedHashMap<>();
+            Map<String, String> agentOutputs = new java.util.LinkedHashMap<>();
             for (var future : futures) {
                 Map.Entry<String, String> result = future.get();
                 agentOutputs.put(result.getKey(), result.getValue());
@@ -343,8 +347,8 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
     /**
      * Extracts the last message from an agent's message history.
      *
-     * @param agent the agent to extract message from
-     * @return the last message or "No output" if no messages exist
+     * @param agent agent to extract message from
+     * @return last message or "No output" if no messages exist
      */
     private String extractLastMessage(BaseAgent agent) {
         var messages = agent.getMessages();
@@ -366,18 +370,18 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
      * Extracts the last step output from an agent's full execution result.
      * The run() method returns a multi-line string with all steps.
      *
-     * @param fullResult the full result from agent.run()
-     * @return the last step output or the full result if parsing fails
+     * @param fullResult full result from agent.run()
+     * @return last step output or full result if parsing fails
      */
     private String extractLastStepOutput(String fullResult) {
         if (fullResult == null || fullResult.isBlank()) {
             return "No output";
         }
 
-        // Split by newlines and find the last step
+        // Split by newlines and find last step
         String[] lines = fullResult.split("\n");
 
-        // Look for the last Step line (format: "StepN: output")
+        // Look for last Step line (format: "StepN: output")
         for (int i = lines.length - 1; i >= 0; i--) {
             String line = lines[i].trim();
             if (line.startsWith("Step") && line.contains(":")) {
@@ -388,7 +392,7 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
             }
         }
 
-        // If no step format found, return the last non-empty line
+        // If no step format found, return last non-empty line
         for (int i = lines.length - 1; i >= 0; i--) {
             String line = lines[i].trim();
             if (!line.isEmpty() && !line.startsWith("Terminated:")) {
@@ -413,5 +417,33 @@ public class TaskCoordinatorImpl implements TaskCoordinator {
         return results.entrySet().stream()
                 .map(entry -> entry.getKey() + ": " + entry.getValue())
                 .collect(Collectors.joining(", "));
+    }
+
+    /**
+     * Shutdown the executor service gracefully.
+     * Called by Spring container when bean is destroyed.
+     */
+    @Override
+    public void destroy() {
+        log.info("Shutting down TaskCoordinator thread pool...");
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.warn("Thread pool did not terminate gracefully, forcing shutdown");
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            log.error("Thread pool shutdown interrupted", e);
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        log.info("TaskCoordinator thread pool shut down successfully");
+    }
+
+    /**
+     * Public method to manually trigger shutdown for testing purposes.
+     */
+    public void shutdownForTest() {
+        destroy();
     }
 }

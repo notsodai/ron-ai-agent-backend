@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: ron-ai-agent
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY}
+
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+
+  search-api:
+    api-key: ${SEARCH_API_KEY}
+
+# 生产环境配置
+app:
+  admin:
+    token: ${APP_ADMIN_TOKEN}  # 必须通过环境变量设置
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}  # 必须通过环境变量设置，例如：https://your-frontend.com
+
+logging:
+  level:
+    com.ron.ronaiagent: INFO
+    org.springframework.web: WARN

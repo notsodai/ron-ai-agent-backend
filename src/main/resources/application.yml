@@ -3,7 +3,7 @@ spring:
     name:
       ron-ai-agent
   profiles:
-    active: local
+    active: dev
   ai:
     ollama:
       base-url: http://localhost:11434

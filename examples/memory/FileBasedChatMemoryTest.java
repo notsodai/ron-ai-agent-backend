@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.chat.memory;
+package com.ron.ronaiagent.examples.memory;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.UserMessage;

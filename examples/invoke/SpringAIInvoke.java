@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.demo.invoke;
+package com.ron.ronaiagent.examples.invoke;
 
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.model.ChatModel;

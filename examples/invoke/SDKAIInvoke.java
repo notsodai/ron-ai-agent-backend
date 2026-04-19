@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.demo.invoke;
+package com.ron.ronaiagent.examples.invoke;
 
 import com.alibaba.dashscope.aigc.generation.Generation;
 import com.alibaba.dashscope.aigc.generation.GenerationParam;

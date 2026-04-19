@@ -1,4 +1,4 @@
-package com.ron.ronaiagent.demo.rag;
+package com.ron.ronaiagent.examples.rag;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

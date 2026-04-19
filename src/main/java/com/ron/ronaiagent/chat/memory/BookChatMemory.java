@@ -2,20 +2,20 @@ package com.ron.ronaiagent.chat.memory;
 
 import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.Message;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 自定义ChatMemory
+ * Custom ChatMemory implementation wrapping a ChatMemoryRepository.
  */
 public class BookChatMemory implements ChatMemory {
-    private final InMemoryChatMemoryRepository repository;
+    private final ChatMemoryRepository repository;
     private final String repositoryId;
 
-    public BookChatMemory(InMemoryChatMemoryRepository repository, String repositoryId) {
+    public BookChatMemory(ChatMemoryRepository repository, String repositoryId) {
         this.repository = repository;
         this.repositoryId = repositoryId;
     }

@@ -1,5 +1,6 @@
 package com.ron.ronaiagent.controller;
 
+import com.ron.ronaiagent.agent.AgentExecutionListener;
 import com.ron.ronaiagent.agent.RonManus;
 import com.ron.ronaiagent.app.BookApp;
 import com.ron.ronaiagent.core.CacheManager;
@@ -57,6 +58,8 @@ public class AIController {
     private CacheManager cacheManager;
     @Resource
     private UnifiedRequestProcessor unifiedRequestProcessor;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AgentExecutionListener agentExecutionListener;
 
     @GetMapping("/book/chat/sync")
     @Operation(
@@ -417,6 +420,9 @@ public class AIController {
 
         try {
             RonManus ronManus = new RonManus(availableTools, dashScopeChatModel);
+            if (agentExecutionListener != null) {
+                ronManus.setExecutionListener(agentExecutionListener);
+            }
             SseEmitter emitter = ronManus.runStream(message);
 
             // 添加完成和错误处理

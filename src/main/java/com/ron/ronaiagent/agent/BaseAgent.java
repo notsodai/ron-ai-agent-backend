@@ -68,6 +68,14 @@ public abstract class BaseAgent {
      * 取消标志
      */
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
+    /**
+     * Context window manager for token estimation and compaction.
+     */
+    private ContextWindowManager contextWindowManager = ContextWindowManager.defaultManager();
+    /**
+     * Execution listener for state persistence.
+     */
+    private AgentExecutionListener executionListener;
 
     public String run(String userPrompt) {
         if (agentState != AgentState.IDLE) {
@@ -80,6 +88,10 @@ public abstract class BaseAgent {
         startTime = LocalDateTime.now();
         cancelled.set(false);
         agentState = AgentState.RUNNING;
+
+        if (executionListener != null) {
+            executionListener.onExecutionStart(name, userPrompt, maxSteps);
+        }
 
         log.info("Starting {} execution - Prompt: {}", name, userPrompt.substring(0, Math.min(100, userPrompt.length())));
 
@@ -103,6 +115,16 @@ public abstract class BaseAgent {
                 results.add(result);
                 currentStep++;
 
+                if (executionListener != null) {
+                    executionListener.onStepComplete(name, currentStep, stepResult);
+                }
+
+                // Compact context if approaching token limit
+                if (contextWindowManager.shouldCompact(messages)) {
+                    messages = contextWindowManager.compact(messages, 3);
+                    log.info("Agent {} compacted context at step {}", name, currentStep);
+                }
+
                 log.info("Agent {} step {} completed: {}", name, currentStep, stepResult.substring(0, Math.min(100, stepResult.length())));
 
                 if (currentStep >= maxSteps) {
@@ -118,11 +140,19 @@ public abstract class BaseAgent {
             String finalResult = StrUtil.join("\n", results);
             log.info("Agent {} execution completed - Duration: {}ms, Steps: {}",
                     name, java.time.Duration.between(startTime, LocalDateTime.now()).toMillis(), currentStep);
+
+            if (executionListener != null) {
+                executionListener.onExecutionComplete(name, agentState, finalResult, getExecutionDurationMillis());
+            }
             return finalResult;
 
         } catch (Exception e) {
             agentState = AgentState.ERROR;
             log.error("Agent {} error at step {}", name, currentStep, e);
+
+            if (executionListener != null) {
+                executionListener.onExecutionComplete(name, agentState, "Error: " + e.getMessage(), getExecutionDurationMillis());
+            }
             return "Error: " + e.getMessage();
         } finally {
             // 清理资源

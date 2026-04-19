@@ -40,9 +40,13 @@ public abstract class ToolCallAgent extends ReActAgent {
      */
     private final ToolCallingManager toolCallingManager;
     /**
-     * 聊天选项，禁用内置的工具调用机制，自己维护上下文
+     * Chat options — disables built-in tool execution to manually control context.
      */
     private final ChatOptions chatOptions;
+    /**
+     * Retry policy for tool execution failures.
+     */
+    private ToolExecutionRetryPolicy retryPolicy = ToolExecutionRetryPolicy.defaultPolicy();
 
     Logger logger = LoggerFactory.getLogger(ToolCallAgent.class);
 
@@ -54,37 +58,33 @@ public abstract class ToolCallAgent extends ReActAgent {
                 .withInternalToolExecutionEnabled(false)
                 .build();
     }
+
     @Override
     public boolean think() {
-        // 传入工具列表调用大模型，得到需⁢要调用的工具列表
-        if (getNextStepPrompt()  != null && !getNextStepPrompt().isEmpty()){
+        if (getNextStepPrompt() != null && !getNextStepPrompt().isEmpty()) {
             UserMessage userMessage = new UserMessage(getNextStepPrompt());
             getMessages().add(userMessage);
         }
         List<Message> messages = getMessages();
         Prompt prompt = new Prompt(messages, chatOptions);
-        try{
-            // 获取工具选项的响应
+        try {
             ChatResponse chatResponse = getChatClient().prompt(prompt)
                     .system(getSystemPrompt())
                     .toolCallbacks(availableTools)
                     .call()
                     .chatResponse();
-            // 获取工具调用结果用于Act
             this.toolCallResponse = chatResponse;
-            // 输出提示信息
-            if (toolCallResponse != null && toolCallResponse.getResult() != null){
+            if (toolCallResponse != null && toolCallResponse.getResult() != null) {
                 AssistantMessage assistantMessage = chatResponse.getResult().getOutput();
                 String result = assistantMessage.getText();
                 List<AssistantMessage.ToolCall> toolCalls = assistantMessage.getToolCalls();
-                logger.info("{}的思考：{}", getName(), result);
-                logger.info("{}选择了{}个工具", getName(), toolCalls.size());
+                logger.info("{} think: {}", getName(), result);
+                logger.info("{} selected {} tool(s)", getName(), toolCalls.size());
                 String toolCallInfo = toolCalls.stream()
-                        .map(toolCall -> String.format("工具：%s,参数：%s", toolCall.getClass(), toolCall.arguments()))
+                        .map(toolCall -> String.format("Tool: %s, Args: %s", toolCall.getClass(), toolCall.arguments()))
                         .collect(Collectors.joining("\n"));
-                logger.info("{}的toolCallInfo：{}", getName(), toolCallInfo);
-                if (toolCalls.isEmpty()){
-                    // 不调用工具时，添加助手消息
+                logger.info("{} toolCallInfo: {}", getName(), toolCallInfo);
+                if (toolCalls.isEmpty()) {
                     getMessages().add(assistantMessage);
                     return false;
                 } else {
@@ -92,8 +92,12 @@ public abstract class ToolCallAgent extends ReActAgent {
                 }
             }
         } catch (Exception e) {
-            logger.error("{}的思考出错：{}", getName(), e.getMessage());
-            getMessages().add(new AssistantMessage("处理时遇到错误" + e.getMessage()));
+            String rootCause = extractRootCause(e);
+            logger.error("{}: think phase error — root cause: {}", getName(), rootCause, e);
+            String errorMsg = String.format(
+                    "Thinking phase error. Root cause: %s. Safe retry: rephrase the query. Stop condition: if error persists after 2 retries.",
+                    rootCause);
+            getMessages().add(new AssistantMessage(errorMsg));
             return false;
         }
         return false;
@@ -101,51 +105,77 @@ public abstract class ToolCallAgent extends ReActAgent {
 
     @Override
     public String act() {
-        if (!toolCallResponse.hasToolCalls()){
-            return "没有调用工具";
+        if (!toolCallResponse.hasToolCalls()) {
+            return "No tool calls requested";
         }
-        try {
-            // 调用工具
-            Prompt prompt = new Prompt(getMessages(), chatOptions);
-            ToolExecutionResult toolExecutionResult = toolCallingManager.executeToolCalls(prompt, toolCallResponse);
 
-            // 记录消息上下文
-            setMessages(toolExecutionResult.conversationHistory());
+        int attempt = 0;
+        Exception lastError = null;
 
-            // Record conversation history
-        List<Message> conversationHistory = toolExecutionResult.conversationHistory();
-            if (!conversationHistory.isEmpty() && conversationHistory.getLast() instanceof ToolResponseMessage toolResponseMessage) {
+        while (retryPolicy.shouldRetry(attempt)) {
+            attempt++;
+            try {
+                Prompt prompt = new Prompt(getMessages(), chatOptions);
+                ToolExecutionResult toolExecutionResult = toolCallingManager.executeToolCalls(prompt, toolCallResponse);
+                setMessages(toolExecutionResult.conversationHistory());
 
-                // 处理工具响应
-                String results = toolResponseMessage.getResponses().stream()
-                        .filter(Objects::nonNull)
-                        .map(response -> "工具" + response.name() + "完成了任务！结果: " +
-                                response.responseData())
-                        .collect(Collectors.joining("\n"));
+                List<Message> history = toolExecutionResult.conversationHistory();
+                if (!history.isEmpty() && history.getLast() instanceof ToolResponseMessage toolResponseMessage) {
+                    String results = toolResponseMessage.getResponses().stream()
+                            .filter(Objects::nonNull)
+                            .map(response -> "Tool " + response.name() + " completed. Result: " + response.responseData())
+                            .collect(Collectors.joining("\n"));
 
-                logger.info("{}的act结果：{}", getName(), results);
+                    logger.info("{} act result: {}", getName(), results);
 
-                // 检查是否调用了终止工具（改进的终止逻辑）
-                boolean hasTerminateTool = toolResponseMessage.getResponses().stream()
-                        .anyMatch(response -> response != null && ("doTerminate".equals(response.name()) || response.name().toLowerCase().contains("terminate")));
+                    boolean hasTerminateTool = toolResponseMessage.getResponses().stream()
+                            .anyMatch(response -> response != null &&
+                                    ("doTerminate".equals(response.name()) ||
+                                            response.name().toLowerCase().contains("terminate")));
 
-                if (hasTerminateTool) {
-                    logger.info("{}已终止", getName());
-                    setAgentState(AgentState.FINISHED);
+                    if (hasTerminateTool) {
+                        logger.info("{} terminated via TerminateTool", getName());
+                        setAgentState(AgentState.FINISHED);
+                    }
+                    return results;
+                } else {
+                    logger.warn("{}: no valid ToolResponseMessage after tool execution", getName());
+                    return "Tool execution completed but no valid response found";
                 }
-
-                return results;
-            } else {
-                logger.warn("{}: 工具执行后未找到有效的ToolResponseMessage", getName());
-                return "工具执行完成，但未获取到有效响应";
+            } catch (Exception e) {
+                lastError = e;
+                logger.warn("{}: tool execution attempt {}/{} failed: {}",
+                        getName(), attempt, retryPolicy.shouldRetry(attempt + 1) ? attempt + 1 : attempt,
+                        e.getMessage());
+                if (retryPolicy.shouldRetry(attempt + 1)) {
+                    try {
+                        Thread.sleep(retryPolicy.getBackoffMs(attempt));
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
             }
-        } catch (Exception e) {
-            logger.error("{}: 工具执行过程中发生错误", getName(), e);
-            return "工具执行失败：" + e.getMessage();
         }
+
+        logger.error("{}: tool execution failed after {} attempts", getName(), attempt, lastError);
+        String errorMsg = "Tool execution failed after " + attempt + " attempts: " +
+                (lastError != null ? lastError.getMessage() : "unknown error");
+        getMessages().add(new AssistantMessage(errorMsg));
+        return errorMsg;
     }
 
     @Override
     public void cleanup() {
+    }
+
+    private String extractRootCause(Throwable t) {
+        Throwable cause = t;
+        int depth = 0;
+        while (cause.getCause() != null && depth < 5) {
+            cause = cause.getCause();
+            depth++;
+        }
+        return cause.getClass().getSimpleName() + ": " + cause.getMessage();
     }
 }

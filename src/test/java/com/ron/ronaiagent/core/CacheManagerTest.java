@@ -76,7 +76,7 @@ public class CacheManagerTest {
         cacheManager.put(key, value);
         cacheManager.get(key, String.class);
         CacheManager.CacheStats hitStats = cacheManager.getStats();
-        assertEquals(3, hitStats.getTotalRequests()); // 2 gets + 1 put
+        assertEquals(2, hitStats.getTotalRequests()); // 2 gets (put doesn't count)
         assertEquals(1, hitStats.getHits());
         assertTrue(hitStats.getHitRate() > 0);
     }

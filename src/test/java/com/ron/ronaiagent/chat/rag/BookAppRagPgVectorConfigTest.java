@@ -1,12 +1,14 @@
 package com.ron.ronaiagent.chat.rag;
 
 import jakarta.annotation.Resource;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.retrieval.join.ConcatenationDocumentJoiner;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * @date 2025/9/7 上午11:12
  */
 @SpringBootTest
+@ActiveProfiles("test")
+@Tag("integration-pgvector")
 class BookAppRagPgVectorConfigTest {
 
     @Resource

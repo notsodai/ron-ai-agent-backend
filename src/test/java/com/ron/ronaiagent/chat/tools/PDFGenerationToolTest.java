@@ -5,10 +5,6 @@ import org.junit.jupiter.api.DisplayName;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * @author admin
- * @date 2025/9/14 下午3:14
- */
 class PDFGenerationToolTest {
 
     private final PDFGenerationTool pdfGenerationTool = new PDFGenerationTool();
@@ -18,7 +14,7 @@ class PDFGenerationToolTest {
     void generatePDFWithValidASCIICharacters() {
         String result = pdfGenerationTool.generatePDF("test.pdf", "Hello, World! This is a test with ASCII characters only.");
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
         assertTrue(result.contains("test.pdf"));
     }
 
@@ -27,7 +23,7 @@ class PDFGenerationToolTest {
     void generatePDFWithChineseCharacters() {
         String result = pdfGenerationTool.generatePDF("test_chinese.pdf", "你好，世界！这是中文内容。");
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
         assertTrue(result.contains("test_chinese.pdf"));
     }
 
@@ -36,7 +32,7 @@ class PDFGenerationToolTest {
     void generatePDFWithMixedCharacters() {
         String result = pdfGenerationTool.generatePDF("test_mixed.pdf", "Hello World 你好!");
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
         assertTrue(result.contains("test_mixed.pdf"));
     }
 
@@ -45,7 +41,7 @@ class PDFGenerationToolTest {
     void generatePDFWithEmptyFilename() {
         String result = pdfGenerationTool.generatePDF("", "Valid content");
         assertNotNull(result);
-        assertTrue(result.contains("Error:"));
+        assertTrue(result.contains("\"status\":\"error\""));
         assertTrue(result.contains("File name cannot be empty"));
     }
 
@@ -54,7 +50,7 @@ class PDFGenerationToolTest {
     void generatePDFWithNullFilename() {
         String result = pdfGenerationTool.generatePDF(null, "Valid content");
         assertNotNull(result);
-        assertTrue(result.contains("Error:"));
+        assertTrue(result.contains("\"status\":\"error\""));
         assertTrue(result.contains("File name cannot be empty"));
     }
 
@@ -63,7 +59,7 @@ class PDFGenerationToolTest {
     void generatePDFWithWhitespaceFilename() {
         String result = pdfGenerationTool.generatePDF("   ", "Valid content");
         assertNotNull(result);
-        assertTrue(result.contains("Error:"));
+        assertTrue(result.contains("\"status\":\"error\""));
         assertTrue(result.contains("File name cannot be empty"));
     }
 
@@ -72,7 +68,7 @@ class PDFGenerationToolTest {
     void generatePDFWithEmptyContent() {
         String result = pdfGenerationTool.generatePDF("test_empty.pdf", "");
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
     }
 
     @Test
@@ -80,7 +76,7 @@ class PDFGenerationToolTest {
     void generatePDFWithNullContent() {
         String result = pdfGenerationTool.generatePDF("test_null.pdf", null);
         assertNotNull(result);
-        assertTrue(result.contains("Error:"));
+        assertTrue(result.contains("\"status\":\"error\""));
         assertTrue(result.contains("Content cannot be null"));
     }
 
@@ -90,7 +86,7 @@ class PDFGenerationToolTest {
         String content = "Test with numbers: 123456789 and special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?";
         String result = pdfGenerationTool.generatePDF("test_special.pdf", content);
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
     }
 
     @Test
@@ -99,7 +95,7 @@ class PDFGenerationToolTest {
         String content = "Line 1\nLine 2\nLine 3";
         String result = pdfGenerationTool.generatePDF("test_newlines.pdf", content);
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
     }
 
     @Test
@@ -107,7 +103,7 @@ class PDFGenerationToolTest {
     void generatePDFWithJapaneseCharacters() {
         String result = pdfGenerationTool.generatePDF("test_japanese.pdf", "こんにちは世界");
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
     }
 
     @Test
@@ -115,8 +111,7 @@ class PDFGenerationToolTest {
     void generatePDFWithEmojiCharacters() {
         String result = pdfGenerationTool.generatePDF("test_emoji.pdf", "Hello World! 😊🎉");
         assertNotNull(result);
-        System.out.println("Emoji test result: " + result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
     }
 
     @Test
@@ -125,7 +120,7 @@ class PDFGenerationToolTest {
         String content = "你好世界！こんにちは！Hello World!";
         String result = pdfGenerationTool.generatePDF("test_multilingual.pdf", content);
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
     }
 
     @Test
@@ -134,7 +129,7 @@ class PDFGenerationToolTest {
         String content = "这是中文测试！包含标点符号：，。；？\"\"''（）【】《》";
         String result = pdfGenerationTool.generatePDF("test_chinese_punctuation.pdf", content);
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
     }
 
     @Test
@@ -143,6 +138,6 @@ class PDFGenerationToolTest {
         String content = "第一行：你好世界\n第二行：这是中文测试\n第三行：PDF生成成功！";
         String result = pdfGenerationTool.generatePDF("test_multiline_chinese.pdf", content);
         assertNotNull(result);
-        assertTrue(result.contains("PDF generated successfully to:"));
+        assertTrue(result.contains("\"status\":\"success\""));
     }
 }

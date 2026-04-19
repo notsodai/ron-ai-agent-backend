@@ -26,16 +26,20 @@ public class ImageSearchTool {
     @Tool(description = "Search for images from the web based on keywords")
     public String searchImages(@ToolParam(description = "Search query keywords for images") String query) {
         if (StrUtil.isBlank(apiKey)) {
-            return "Error searching images: missing pexels api key";
+            return ToolResult.error("Missing Pexels API key").toJson();
         }
         try {
             List<String> imageUrls = searchMediumImages(query);
             if (imageUrls.isEmpty()) {
-                return "No images found for query: " + query;
+                return ToolResult.success("No images found for query: " + query)
+                        .withNextActions(List.of("Try different search terms"))
+                        .toJson();
             }
-            return String.join(",", imageUrls);
+            return ToolResult.success("Found " + imageUrls.size() + " images for: " + query + "\n" + String.join(",", imageUrls))
+                    .withNextActions(List.of("Download an image", "Search for more images"))
+                    .toJson();
         } catch (Exception e) {
-            return "Error searching images: " + e.getMessage();
+            return ToolResult.error("Error searching images: " + e.getMessage()).toJson();
         }
     }
 

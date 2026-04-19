@@ -9,6 +9,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.List;
 
 public class ResourceDownloadTool {
 
@@ -23,9 +24,11 @@ public class ResourceDownloadTool {
             FileUtil.mkdir(DOWNLOAD_DIR);
             Path filePath = ToolSecurityUtils.resolveSafePath(DOWNLOAD_DIR, fileName);
             HttpUtil.downloadFile(safeUri.toString(), new File(filePath.toString()));
-            return "Resource downloaded successfully to: " + filePath;
+            return ToolResult.success("Resource downloaded successfully to: " + filePath)
+                    .withArtifacts(List.of(filePath.toString()))
+                    .toJson();
         } catch (Exception e) {
-            return "Error downloading resource: " + e.getMessage();
+            return ToolResult.error("Error downloading resource: " + e.getMessage()).toJson();
         }
     }
 }

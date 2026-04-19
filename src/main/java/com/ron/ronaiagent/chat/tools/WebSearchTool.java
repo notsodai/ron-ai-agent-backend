@@ -25,10 +25,10 @@ public class WebSearchTool {
     @Tool(description = "Search for information from Baidu Search Engine")
     public String searchWeb(@ToolParam(description = "Search query keyword") String query) {
         if (StrUtil.isBlank(query)) {
-            return "Error searching Baidu: query cannot be blank";
+            return ToolResult.error("Search query cannot be blank").toJson();
         }
         if (StrUtil.isBlank(apiKey)) {
-            return "Error searching Baidu: missing search api key";
+            return ToolResult.error("Missing search API key").toJson();
         }
 
         Map<String, Object> paramMap = new HashMap<>();
@@ -41,17 +41,22 @@ public class WebSearchTool {
             JSONObject jsonObject = JSONUtil.parseObj(response);
             JSONArray organicResults = jsonObject.getJSONArray("organic_results");
             if (organicResults == null || organicResults.isEmpty()) {
-                return "";
+                return ToolResult.success("No results found for: " + query)
+                        .withNextActions(List.of("Try different search terms"))
+                        .toJson();
             }
 
             int resultSize = Math.min(5, organicResults.size());
             List<Object> objects = organicResults.subList(0, resultSize);
-            return objects.stream()
+            String results = objects.stream()
                     .map(obj -> (JSONObject) obj)
                     .map(JSONObject::toString)
                     .collect(Collectors.joining(","));
+            return ToolResult.success("Found " + resultSize + " results for: " + query + "\n" + results)
+                    .withNextActions(List.of("Read a specific result", "Refine search terms", "Scrape a result page"))
+                    .toJson();
         } catch (Exception e) {
-            return "Error searching Baidu: " + e.getMessage();
+            return ToolResult.error("Search failed: " + e.getMessage()).toJson();
         }
     }
 }

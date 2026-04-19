@@ -13,6 +13,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.regex.Pattern;
 
 public class PDFGenerationTool {
@@ -25,10 +26,10 @@ public class PDFGenerationTool {
             @ToolParam(description = "Name of the file to save the generated PDF") String fileName,
             @ToolParam(description = "Content to be included in the PDF") String content) {
         if (fileName == null || fileName.trim().isEmpty()) {
-            return "Error: File name cannot be empty";
+            return ToolResult.error("File name cannot be empty").toJson();
         }
         if (content == null) {
-            return "Error: Content cannot be null";
+            return ToolResult.error("Content cannot be null").toJson();
         }
         try {
             String normalizedName = fileName.endsWith(".pdf") ? fileName : fileName + ".pdf";
@@ -43,11 +44,14 @@ public class PDFGenerationTool {
                 applyBestEffortFont(document);
                 document.add(paragraph);
             }
-            return "PDF generated successfully to: " + filePath;
+            return ToolResult.success("PDF generated successfully to: " + filePath)
+                    .withArtifacts(List.of(filePath.toString()))
+                    .withNextActions(List.of("Read the generated PDF", "Download the PDF"))
+                    .toJson();
         } catch (IOException e) {
-            return "Error generating PDF: " + e.getMessage();
+            return ToolResult.error("Error generating PDF: " + e.getMessage()).toJson();
         } catch (Exception e) {
-            return "Unexpected error generating PDF: " + e.getMessage();
+            return ToolResult.error("Unexpected error generating PDF: " + e.getMessage()).toJson();
         }
     }
 

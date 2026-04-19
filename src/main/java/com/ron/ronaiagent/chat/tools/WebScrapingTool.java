@@ -6,6 +6,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
 import java.net.URI;
+import java.util.List;
 
 public class WebScrapingTool {
 
@@ -16,9 +17,11 @@ public class WebScrapingTool {
             Document doc = Jsoup.connect(safeUri.toString())
                     .timeout(10_000)
                     .get();
-            return doc.html();
+            return ToolResult.success("Scraped content from: " + safeUri + "\n" + doc.html())
+                    .withNextActions(List.of("Extract specific information", "Summarize the page content"))
+                    .toJson();
         } catch (Exception e) {
-            return "Error scraping web page: " + e.getMessage();
+            return ToolResult.error("Error scraping web page: " + e.getMessage()).toJson();
         }
     }
 }

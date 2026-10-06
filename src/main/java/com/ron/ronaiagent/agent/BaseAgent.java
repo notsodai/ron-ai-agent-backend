@@ -305,4 +305,10 @@ public abstract class BaseAgent {
      * 清理资源
      */
     public abstract void cleanup();
+
+    protected void resetExecutionState() {
+        currentStep = 0;
+        cancelled.set(false);
+        agentState = AgentState.IDLE;
+    }
 }

@@ -1,14 +1,9 @@
 spring:
   application:
-    name:
-      ron-ai-agent
+    name: ron-ai-agent
   profiles:
     active: dev
   ai:
-    ollama:
-      base-url: http://localhost:11434
-      chat:
-        model: gpt-oss:20b
     vectorstore:
       pgvector:
         index-type: HNSW

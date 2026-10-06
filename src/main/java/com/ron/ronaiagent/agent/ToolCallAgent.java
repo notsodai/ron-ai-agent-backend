@@ -19,6 +19,7 @@ import org.springframework.ai.tool.ToolCallback;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import com.ron.ronaiagent.dto.AgentEvent;
 
 /**
  * @author admin
@@ -80,6 +81,23 @@ public abstract class ToolCallAgent extends ReActAgent {
                 List<AssistantMessage.ToolCall> toolCalls = assistantMessage.getToolCalls();
                 logger.info("{} think: {}", getName(), result);
                 logger.info("{} selected {} tool(s)", getName(), toolCalls.size());
+                /*
+                 * Agent 选择了 Tool。
+                 * 这里通知前端：
+                 * TOOL_START
+                 */
+                if (toolCalls != null && !toolCalls.isEmpty()) {
+                    for (AssistantMessage.ToolCall toolCall : toolCalls) {
+                        sendEvent(
+                                AgentEvent.toolStart(
+                                        getName(),
+                                        getCurrentStep(),
+                                        toolCall.name(),
+                                        "正在执行工具"
+                                )
+                        );
+                    }
+                }
                 String toolCallInfo = toolCalls.stream()
                         .map(toolCall -> String.format("Tool: %s, Args: %s", toolCall.getClass(), toolCall.arguments()))
                         .collect(Collectors.joining("\n"));
@@ -125,7 +143,24 @@ public abstract class ToolCallAgent extends ReActAgent {
                             .filter(Objects::nonNull)
                             .map(response -> "Tool " + response.name() + " completed. Result: " + response.responseData())
                             .collect(Collectors.joining("\n"));
-
+                    /*
+                     * 发送 Tool 执行结果事件。
+                     * 第一版不把全部 responseData
+                     * 暴露给前端。
+                     * 前端只知道：
+                     * 某个工具执行成功。
+                     */
+                    toolResponseMessage.getResponses().stream().filter(Objects::nonNull)
+                            .forEach(response -> {
+                                sendEvent(
+                                        AgentEvent.toolResult(
+                                                getName(),
+                                                getCurrentStep(),
+                                                response.name(),
+                                                "工具执行完成"
+                                        )
+                                );
+                            });
                     logger.info("{} act result: {}", getName(), results);
 
                     boolean hasTerminateTool = toolResponseMessage.getResponses().stream()
@@ -161,6 +196,7 @@ public abstract class ToolCallAgent extends ReActAgent {
         logger.error("{}: tool execution failed after {} attempts", getName(), attempt, lastError);
         String errorMsg = "Tool execution failed after " + attempt + " attempts: " +
                 (lastError != null ? lastError.getMessage() : "unknown error");
+        sendEvent(AgentEvent.error(getName(),getCurrentStep(),errorMsg));
         getMessages().add(new AssistantMessage(errorMsg));
         return errorMsg;
     }

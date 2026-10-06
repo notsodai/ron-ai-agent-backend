@@ -9,12 +9,13 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
+import com.ron.ronaiagent.dto.AgentEvent;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * @author admin
@@ -76,6 +77,44 @@ public abstract class BaseAgent {
      * Execution listener for state persistence.
      */
     private AgentExecutionListener executionListener;
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    /**
+     * 当前流式执行使用的 SSE emitter。
+     *
+     * 只在 runStream 生命周期内有效。
+     */
+    private transient SseEmitter currentEmitter;
+
+    /**
+     * 向前端发送统一 AgentEvent。
+     */
+    protected void sendEvent(AgentEvent event) {
+        SseEmitter emitter = this.currentEmitter;
+        if (emitter == null) {
+            return;
+        }
+        try {
+            String json =
+                    OBJECT_MAPPER
+                            .writeValueAsString(event);
+            emitter.send(
+                    SseEmitter.event()
+                            .name(
+                                    event.getType()
+                                            .toLowerCase()
+                            )
+                            .data(json)
+            );
+        } catch (Exception e) {
+            log.error(
+                    "Failed to send Agent event: {}",
+                    event,
+                    e
+            );
+        }
+    }
 
     public String run(String userPrompt) {
         if (agentState != AgentState.IDLE) {
@@ -161,110 +200,386 @@ public abstract class BaseAgent {
     }
 
     /**
-     * 流式执行
+     * 流式执行 Agent
+     *
+     * 当前版本：
+     *
+     * 1. SSE 使用统一 AgentEvent
+     * 2. 不再向前端发送 Step1/Step2 文本
+     * 3. ToolCallAgent 可以通过 sendEvent() 主动发送工具事件
      *
      * @param userPrompt 用户输入
-     * @return 执行结果
+     * @return SseEmitter
      */
     public SseEmitter runStream(String userPrompt) {
-        SseEmitter sseEmitter = new SseEmitter(180000L);
 
-        // 设置事件处理器
+        SseEmitter sseEmitter =
+                new SseEmitter(180000L);
+
+        /*
+         * 保存当前 emitter，
+         * 供子类 ToolCallAgent 发送事件。
+         */
+        this.currentEmitter =
+                sseEmitter;
+
+
+        /*
+         * 超时
+         */
         sseEmitter.onTimeout(() -> {
-            log.warn("Agent {} stream timeout", name);
+
+            log.warn(
+                    "Agent {} stream timeout",
+                    name
+            );
+
             cancelled.set(true);
-            agentState = AgentState.ERROR;
+
+            agentState =
+                    AgentState.ERROR;
+
+            sendEvent(
+                    AgentEvent.error(
+                            name,
+                            currentStep,
+                            "Agent execution timeout"
+                    )
+            );
+
             cleanup();
+
+            currentEmitter = null;
         });
 
+
+        /*
+         * 正常完成
+         */
         sseEmitter.onCompletion(() -> {
-            log.info("Agent {} stream completed", name);
-            agentState = AgentState.IDLE;
+
+            log.info(
+                    "Agent {} stream completed",
+                    name
+            );
+
+            agentState =
+                    AgentState.IDLE;
+
             cleanup();
+
+            currentEmitter = null;
         });
 
-        // 异步执行，避免阻塞
+
         CompletableFuture.runAsync(() -> {
+
             try {
-                if (agentState != AgentState.IDLE) {
-                    log.warn("Agent {} is not idle, current state: {}", name, agentState);
-                    sseEmitter.send("Agent is not idle: " + agentState);
+
+                /*
+                 * 状态检查
+                 */
+                if (agentState
+                        != AgentState.IDLE) {
+
+                    log.warn(
+                            "Agent {} is not idle, current state: {}",
+                            name,
+                            agentState
+                    );
+
+                    sendEvent(
+                            AgentEvent.error(
+                                    name,
+                                    currentStep,
+                                    "Agent is not idle: "
+                                            + agentState
+                            )
+                    );
+
+                    sendEvent(
+                            AgentEvent.done(
+                                    name,
+                                    currentStep
+                            )
+                    );
+
                     sseEmitter.complete();
+
                     return;
                 }
 
-                if (StrUtil.isBlank(userPrompt)) {
-                    log.warn("Agent {} received empty user prompt", name);
-                    sseEmitter.send("User prompt cannot be empty");
+                /*
+                 * 参数检查
+                 */
+                if (StrUtil.isBlank(
+                        userPrompt)) {
+
+                    log.warn(
+                            "Agent {} received empty user prompt",
+                            name
+                    );
+
+                    sendEvent(
+                            AgentEvent.error(
+                                    name,
+                                    currentStep,
+                                    "User prompt cannot be empty"
+                            )
+                    );
+
+                    sendEvent(
+                            AgentEvent.done(
+                                    name,
+                                    currentStep
+                            )
+                    );
+
                     sseEmitter.complete();
+
                     return;
                 }
 
-                startTime = LocalDateTime.now();
+                startTime =
+                        LocalDateTime.now();
+
                 cancelled.set(false);
-                agentState = AgentState.RUNNING;
 
-                log.info("Starting {} stream execution - Prompt: {}", name, userPrompt.substring(0, Math.min(100, userPrompt.length())));
+                agentState =
+                        AgentState.RUNNING;
 
-                // 添加用户输入
-                messages.add(new UserMessage(userPrompt));
+                log.info(
+                        "Starting {} stream execution - Prompt: {}",
+                        name,
+                        userPrompt.substring(
+                                0,
+                                Math.min(
+                                        100,
+                                        userPrompt.length()
+                                )
+                        )
+                );
+
+                /*
+                 * 通知前端：
+                 *
+                 * Agent 开始处理。
+                 */
+                sendEvent(
+                        AgentEvent.status(
+                                name,
+                                0,
+                                "正在处理请求"
+                        )
+                );
+
+                /*
+                 * 添加用户输入
+                 */
+                messages.add(
+                        new UserMessage(
+                                userPrompt
+                        )
+                );
 
                 try {
-                    for (int i = 0; i < maxSteps && agentState != AgentState.FINISHED && !cancelled.get(); i++) {
+
+                    for (
+                            int i = 0;
+                            i < maxSteps
+                                    && agentState
+                                    != AgentState.FINISHED
+                                    && !cancelled.get();
+                            i++
+                    ) {
+
                         if (cancelled.get()) {
-                            log.info("Agent {} stream execution cancelled at step {}", name, i + 1);
-                            sseEmitter.send("Execution cancelled at step " + (i + 1));
+
+                            log.info(
+                                    "Agent {} stream execution cancelled at step {}",
+                                    name,
+                                    i + 1
+                            );
+
+                            sendEvent(
+                                    AgentEvent.error(
+                                            name,
+                                            i + 1,
+                                            "Execution cancelled"
+                                    )
+                            );
+
                             break;
                         }
 
-                        currentStep = i + 1;
-                        log.debug("Agent {} executing stream step {}/{}", name, currentStep, maxSteps);
+                        currentStep =
+                                i + 1;
 
-                        String stepResult = step();
-                        String stepMessage = "Step" + currentStep + ": " + stepResult;
 
-                        sseEmitter.send(stepMessage);
-                        log.info("Agent {} stream step {} completed", name, currentStep);
+                        log.debug(
+                                "Agent {} executing stream step {}/{}",
+                                name,
+                                currentStep,
+                                maxSteps
+                        );
 
-                        if (currentStep >= maxSteps) {
-                            agentState = AgentState.FINISHED;
-                            sseEmitter.send("Terminated: Reached max steps (" + maxSteps + ")");
-                            log.info("Agent {} stream finished - reached max steps", name);
+                        /*
+                         * 只告诉前端：
+                         *
+                         * 当前 Agent 正在工作。
+                         *
+                         * 不发送内部完整推理内容。
+                         */
+                        sendEvent(
+                                AgentEvent.status(
+                                        name,
+                                        currentStep,
+                                        "正在处理"
+                                )
+                        );
+
+
+                        /*
+                         * 执行 ReAct step
+                         */
+                        String stepResult =
+                                step();
+
+                        log.info(
+                                "Agent {} stream step {} completed",
+                                name,
+                                currentStep
+                        );
+
+                        /*
+                         * 如果 Agent 已经结束，
+                         * 当前 stepResult 可认为是最终答案。
+                         *
+                         * 这里依赖你现有 ReActAgent.step()
+                         * 的行为：
+                         *
+                         * think() 不再请求工具时，
+                         * step() 返回最终响应。
+                         */
+                        if (agentState
+                                == AgentState.FINISHED) {
+
+                            if (stepResult != null
+                                    && !stepResult.isBlank()) {
+
+                                sendEvent(
+                                        AgentEvent.answer(
+                                                name,
+                                                currentStep,
+                                                stepResult
+                                        )
+                                );
+                            }
+
+                            break;
+                        }
+
+                        /*
+                         * 达到最大步骤
+                         */
+                        if (currentStep
+                                >= maxSteps) {
+
+                            agentState =
+                                    AgentState.FINISHED;
+
+                            log.info(
+                                    "Agent {} stream finished - reached max steps",
+                                    name
+                            );
+                            sendEvent(
+                                    AgentEvent.error(
+                                            name,
+                                            currentStep,
+                                            "Reached max steps ("
+                                                    + maxSteps
+                                                    + ")"
+                                    )
+                            );
                             break;
                         }
                     }
 
-                    // 发送完成标记
-                    sseEmitter.send("[DONE]");
+                    /*
+                     * 正常完成事件
+                     */
+                    sendEvent(
+                            AgentEvent.done(
+                                    name,
+                                    currentStep
+                            )
+                    );
 
-                    // 延迟完成，确保客户端收到所有数据
+                    /*
+                     * 给客户端一点时间接收 DONE。
+                     */
                     Thread.sleep(100);
+
                     sseEmitter.complete();
 
-                    log.info("Agent {} stream execution completed - Duration: {}ms, Steps: {}",
-                            name, java.time.Duration.between(startTime, LocalDateTime.now()).toMillis(), currentStep);
+                    log.info(
+                            "Agent {} stream execution completed - Duration: {}ms, Steps: {}",
+                            name,
+                            java.time.Duration
+                                    .between(
+                                            startTime,
+                                            LocalDateTime.now()
+                                    )
+                                    .toMillis(),
+                            currentStep
+                    );
 
                 } catch (Exception e) {
-                    agentState = AgentState.ERROR;
-                    log.error("Agent {} stream error at step {}", name, currentStep, e);
-                    try {
-                        sseEmitter.send("Error: " + e.getMessage());
-                        sseEmitter.send("[ERROR]");
-                        sseEmitter.complete();
-                    } catch (Exception e1) {
-                        log.error("Error sending error response", e1);
-                        sseEmitter.completeWithError(e1);
-                    }
+                    agentState =
+                            AgentState.ERROR;
+                    log.error(
+                            "Agent {} stream error at step {}",
+                            name,
+                            currentStep,
+                            e
+                    );
+                    sendEvent(
+                            AgentEvent.error(
+                                    name,
+                                    currentStep,
+                                    e.getMessage()
+                            )
+                    );
+                    sendEvent(
+                            AgentEvent.done(
+                                    name,
+                                    currentStep
+                            )
+                    );
+                    sseEmitter.complete();
                 } finally {
                     cleanup();
                 }
 
+
             } catch (Exception e) {
-                log.error("Agent {} stream initialization error", name, e);
-                sseEmitter.completeWithError(e);
+                log.error(
+                        "Agent {} stream initialization error",
+                        name,
+                        e
+                );
+                sendEvent(
+                        AgentEvent.error(
+                                name,
+                                currentStep,
+                                e.getMessage()
+                        )
+                );
+                sseEmitter.completeWithError(
+                        e
+                );
             }
         });
-
         return sseEmitter;
     }
 
